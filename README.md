@@ -19,10 +19,10 @@ a game (naming the score: ENVIAR); a pad plays the OUVIDO note again. Title: < >
 knobs as on the keyboard, each drawn: the filter, the envelope, the drive, the room, the echoes); GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the
 web; SOM; NOTAS INICIAIS; ACERTOS/FASE). The sound: K1..K8 BRILHO, RESSONÂNCIA, ATAQUE, RELEASE, DRIVE, SALA, ECO
 TEMPO, ECO REPETE; the faders VOLUME, REVERB, DELAY, CHORUS; the pitch wheel a bend; the mod wheel lightning on the
-orbit (the sound's place jumps about as a bolt). PARA: the VETOR, the same for every sound: a Lissajous round the four
-corners, running free; on, the knobs are its (K1..K3 the figure: FREQ X, FREQ Y, FASE; K4..K7 each corner's
-brightness; K8 the speed; on the PATCH screen the sound's own stay); PARA there switches it, PLAY goes home. Off,
-every note starts the same (the same key, the same sound). The
+VETOR's point (thrown about as a bolt). PARA (in, and out again): the VETOR, the same for every sound: a Lissajous
+running free round the four corners, each corner a brightness; where its point is, their brightness blended moves the
+sound's filter, and nothing else. On its screen the knobs are its (K1..K3 the figure, K4..K7 each corner's brightness:
+at 0 it changes nothing, K8 the speed). The
 simulator page installs it on the keyboard (CONECTAR, INSTALAR: Chrome / Edge).
 
 ```

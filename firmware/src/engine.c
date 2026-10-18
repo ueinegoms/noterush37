@@ -9,10 +9,6 @@ static patch_t pt;                         /* the sound */
 static voice_t vs[NVOICE];
 static volatile uint8_t vmax = NVOICE;     /* voices allowed now (the CPU guard, mix.c) */
 static volatile int32_t joy_x, joy_y;      /* wheels, Q15: bend -32767..32767, mod 0..32767 */
-static volatile int32_t orb_dx, orb_dy;    /* NOTE RUSH 37: the orbit's place moved by this (Q15; the mod wheel's
-                                              lightning, game.c) */
-static volatile uint32_t orb_q8 = 256;     /* NOTE RUSH 37: the orbit's speed x this / 256 (the VETOR's speed; the
-                                              tempo, which the delay follows, untouched) */
 static volatile uint8_t focus;             /* 0 off, 1..4 a corner, 5 the centre: the orbit stands there */
 static volatile uint8_t solo;              /* bit c: corner c alone (its mute pad held) */
 static volatile uint8_t latch;             /* notes stay after the keys let go */
@@ -670,7 +666,7 @@ static int32_t spin_inc(void)                              /* SPIN's turn per ti
 static uint32_t orbit_inc(void)                            /* the orbit's phase step per tick */
 {
     uint32_t beats8 = RATE_BEATS8[clamp(pt.g[G_RATE], 0, 8)];
-    return (uint32_t)((uint64_t)((uint32_t)pt.g[G_TEMPO] * BEAT8_K / beats8) * orb_q8 >> 8);
+    return (uint32_t)pt.g[G_TEMPO] * BEAT8_K / beats8;
 }
 
 /* the suborbit around (x, y): the green orb; the focus overrides both */
@@ -717,7 +713,6 @@ static void voice_tick(voice_t *v, uint32_t oinc, uint32_t sinc)
     v->sph += sinc;
     orbit_path(v->oph - oinc, p, &x, &y);
     orbit_place(&x, &y);
-    x = clamp(x + orb_dx, -32767, 32767), y = clamp(y + orb_dy, -32767, 32767);
     if (orbit_all_adsr() && v->ostage == 3u) {             /* the release starts where the orb was */
         x = v->rx + (int32_t)(((int64_t)(x - v->rx) * v->oprog) >> 16);
         y = v->ry + (int32_t)(((int64_t)(y - v->ry) * v->oprog) >> 16);

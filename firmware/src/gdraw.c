@@ -288,8 +288,8 @@ static void card_board(void)
     lb_rows(98, ui.rank);
     button(194, 30, "IN\xCD" "CIO (PLAY)", C_YEL, C_BOX);
 }
-/* the VETOR (PARA): the square of the four corners, the path as it is now, the sound's place on it (the dot), and the
- * mod wheel's lightning: its trail from the path out to the dot */
+/* the VETOR (PARA): the four corners (each its brightness, as set), the figure, its point (where the brightness is
+ * taken) and the mod wheel's bolt: its trail from the figure out to the point */
 #define VX0 59
 #define VY0 75
 #define VW 122
@@ -297,32 +297,41 @@ static int32_t vx(int32_t q) { return VX0 + (((q + 32768) * (VW - 1)) >> 16); }
 static int32_t vy(int32_t q) { return VY0 + (((q + 32768) * (VW - 1)) >> 16); }
 static void card_vector(void)
 {
-    static const char *const NUM[NC] = {"1", "2", "3", "4"};
-    int32_t i, x, y, px = 0, py = 0, bx, by;
+    char b[8];
+    int32_t i, x, y, px = 0, py = 0, bx = vp.x - vb.x, by = vp.y - vb.y;
     uint32_t c;
-    card_title(vec.on ? "VETOR LISSAJOUS - LIGADO" : "VETOR LISSAJOUS - DESLIGADO");
-    for (i = 0; i <= 128; i++) {                   /* the path, 128 pieces round */
-        orbit_path((uint32_t)i << 25, 0, &x, &y);
-        orbit_place_spin(&x, &y, 0);
-        x = vx(x), y = vy(y);
+    opar_t o;
+    card_title("VETOR LISSAJOUS: O BRILHO");
+    memset(&o, 0, sizeof o);
+    o.wx = vec.ph * 256, o.wy = vec.fx * 256, o.mo = vec.fy * 256;
+    for (i = 0; i <= 128; i++) {                   /* the figure, 128 pieces round */
+        fam_xy(SH_LISSA, &o, (uint32_t)i << 25, &x, &y);
+        x = vx(x * 7 / 8), y = vy(y * 7 / 8);
         if (i)
-            cv_line(px, py, x, y, vec.on ? C_STAFF : C_MUT);
+            cv_line(px, py, x, y, C_STAFF);
         px = x, py = y;
     }
-    for (c = 0; c < NC; c++) {                     /* the corners: 1 2 above, 3 4 below */
-        int32_t cx = c & 1u ? VX0 + VW - 1 : VX0, cy = c & 2u ? VY0 + VW - 1 : VY0;
+    for (c = 0; c < NC; c++) {                     /* the corners: 1 2 above, 3 4 below; their brightness beside */
+        int32_t cx = c & 1u ? VX0 + VW - 1 : VX0, cy = c & 2u ? VY0 + VW - 1 : VY0, v = vec.cut[c];
         ellipse(cx, cy, 8, 8, C_YEL);
-        text_c(cx, cy - 8, &FONT_S, NUM[c], C_BOX);
+        b[0] = (char)('1' + c), b[1] = 0;
+        text_c(cx, cy - 8, &FONT_S, b, C_BOX);
+        b[0] = v < 0 ? '-' : '+';
+        num(b + 1, (uint32_t)(v < 0 ? -v : v));
+        if (c & 1u)
+            text_b(cx + 11, cy - 8, &FONT_S, b, C_YEL);
+        else
+            text_r(cx - 10, cy - 8, &FONT_S, b, C_YEL);
     }
-    bx = vx(syn.ox - orb_dx), by = vy(syn.oy - orb_dy);   /* the path's point; the bolt's trail out from it */
-    for (i = 0, px = bx, py = by; i < (int32_t)vb.tn; i++) {
-        x = vx(clamp(syn.ox - orb_dx + vb.tr[i][0], -32767, 32767)), y = vy(clamp(syn.oy - orb_dy + vb.tr[i][1], -32767, 32767));
+    px = vx(bx), py = vy(by);                      /* the bolt's trail out from the figure */
+    for (i = 0; i < (int32_t)vb.tn; i++) {
+        x = vx(clamp(bx + vb.tr[i][0], -32767, 32767)), y = vy(clamp(by + vb.tr[i][1], -32767, 32767));
         cv_line(px, py, x, y, C_YEL);
         px = x, py = y;
     }
-    ellipse(vx(syn.gx), vy(syn.gy), 4, 4, vec.on ? C_YEL : C_MUT);
+    ellipse(vx(vp.x), vy(vp.y), 4, 4, C_YEL);
     text_c(120, 208, &FONT_S, "K1-3 FORMA K4-7 CANTO K8 VEL", C_MUT);
-    text_c(120, 222, &FONT_S, vec.on ? "PARA DESLIGA  PLAY VOLTA" : "PARA LIGA  PLAY VOLTA", C_YEL);
+    text_c(120, 222, &FONT_S, "PARA OU PLAY: SAIR", C_YEL);
 }
 /* the PATCH screen: the sound's eight knobs as they sit on the keyboard, K1 .. K8 left to right, a column each (a dial
  * and its value); over each pair what it does, drawn in 1 px lines: the filter's curve (BRILHO, RESSONANCIA), the
@@ -347,7 +356,7 @@ static void circle(int32_t cx, int32_t cy, int32_t r, uint16_t c)   /* 1 px roun
 }
 static void sp_filter(int32_t x0, int32_t w, uint16_t c)   /* flat, a bump at the cutoff (resonance), then down */
 {
-    int32_t cut = pt.c[0][CP_CUT], res = pt.c[0][CP_RES], fc = cut * (w - 1) / 127, x, px = 0, py = 0, bot = SP_Y0 + SP_H;
+    int32_t cut = base_cut[0], res = pt.c[0][CP_RES], fc = cut * (w - 1) / 127, x, px = 0, py = 0, bot = SP_Y0 + SP_H;
     for (x = 0; x < w; x++) {
         int32_t d = x - fc, lv = SP_H * 3 / 5, bump = res * (SP_H / 3) / 127, k = d < 0 ? -d : d, y;
         if (k < 7)
@@ -413,7 +422,7 @@ static void card_sound(void)
     sp_echo(kcol(6), 54, lit == 7u || lit == 8u ? C_YEL : C_STAFF);
     for (k = 0; k < 8u; k++) {                     /* the dials: -135 .. +135 degrees */
         const sctl_t *c = &KNOB[k];
-        int32_t v = c->corner ? pt.c[0][c->id] : pt.g[c->id], lo = c->corner ? CDESC[c->id].min : GDESC[c->id].min;
+        int32_t v = c->corner ? (c->id == CP_CUT ? base_cut[0] : pt.c[0][c->id]) : pt.g[c->id], lo = c->corner ? CDESC[c->id].min : GDESC[c->id].min;
         int32_t hi = c->corner ? CDESC[c->id].max : GDESC[c->id].max, cx = kcol(k) + 14;
         uint32_t ph = (uint32_t)(((int64_t)(v - lo) * 270 / (hi - lo) - 135) * 11930465);   /* (degrees x 2^32 / 360) */
         uint16_t col = lit == k + 1u ? C_YEL : C_STAFF;
@@ -476,7 +485,7 @@ static void title(void)                            /* the web's home: the rankin
         str_cat(b, MODE_NAME[ui.mode], sizeof b);
         str_cat(b, " >  GLOBE: CONFIG", sizeof b);
         text_c(120, 209, &FONT_S, b, C_MUT);
-        text_c(120, 224, &FONT_S, vec.on ? "PATCH: SOM  PARA: VETOR ON" : "PATCH: SOM  PARA: VETOR", vec.on ? C_YEL : C_MUT);
+        text_c(120, 224, &FONT_S, "PATCH: SOM  PARA: VETOR", C_MUT);
     }
 }
 static void bolts(void)                            /* the lightning over everything (game.c: lightning): 1 px of */

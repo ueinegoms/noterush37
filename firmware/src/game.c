@@ -16,9 +16,10 @@
  * value); PATCH: the sound (K1..K8 its parameters, drawn); PARA: the VETOR. The name: OCT+ OCT- the letter, < > the
  * place. The sound everywhere: K1..K8 (or the VETOR's), the faders VOLUME, REVERB, DELAY, CHORUS, the pitch wheel a
  * bend, the mod wheel lightning on the orbit (the sound's place jumps about as a bolt).
- * The VETOR, the same for every sound: a Lissajous path round the four corners, running free (a note sounds where the
- * path is); while it is on the knobs are its (but on the PATCH screen): K1 K2 K3 the figure (FREQ X, FREQ Y, FASE),
- * K4..K7 each corner's brightness, K8 its speed. PARA there switches it on / off. */
+ * The VETOR (PARA: in, and out again), the same for every sound: a Lissajous running free round the four corners, each
+ * corner a brightness; where its point is, the corners' brightness blended moves the sound's filter (that alone: the
+ * sound's own path and corners stay as they are). On its screen the knobs are its: K1 K2 K3 the figure (FREQ X,
+ * FREQ Y, FASE), K4..K7 each corner's brightness, K8 its speed. The mod wheel throws its point about as a bolt. */
 #if !BOARD_SMK37
 #error "NOTE RUSH 37 is for the SMK-37 (Pro / Elite / MKE-P37)"
 #endif
@@ -70,13 +71,14 @@ static const sctl_t FADER[4] = {{"VOLUME", 0, G_VOLUME}, {"REVERB", 0, G_RVMIX},
 
 /* the VETOR (PARA): a store object of its own; the corners' brightness: added to the sound's own */
 #define VEC_OBJ (OBJ_SCENE0 + 2u)
-#define VEC_MAGIC 0x4E525631u                      /* "NRV1" */
-typedef struct { uint32_t magic; uint8_t on, speed; int8_t fx, fy, ph, cut[NC]; uint8_t rsv; } vec_t;
-static vec_t vec = {VEC_MAGIC, 0, 48, -64, -39, 0, {0, 0, 0, 0}, 0}, vec_was;   /* (a figure eight) */
+#define VEC_MAGIC 0x4E525632u                      /* "NRV2" */
+typedef struct { uint32_t magic; uint8_t rsv, speed; int8_t fx, fy, ph, cut[NC]; uint8_t rsv2; } vec_t;
+#define VEC_DEFAULT {VEC_MAGIC, 0, 48, -64, -39, 0, {0, 0, 0, 0}, 0}   /* (a figure eight; the corners at 0: it */
+static vec_t vec = VEC_DEFAULT, vec_was;                            /*  changes nothing until they are turned) */
 static const char *const VEC_NAME[8] = {"FREQ X", "FREQ Y", "FASE", "BRILHO CANTO 1", "BRILHO CANTO 2",
                                         "BRILHO CANTO 3", "BRILHO CANTO 4", "VELOCIDADE"};
 #define VEC_SPEED_MAX 112
-static int16_t base_cut[NC];                       /* the sound's own corner cutoffs */
+static int16_t base_cut[NC];                       /* the sound's own corner cutoffs (K1 BRILHO moves them) */
 static const int8_t DIR16[16][2] = {{64, 0}, {59, 24}, {45, 45}, {24, 59}, {0, 64}, {-24, 59}, {-45, 45}, {-59, 24},
                                     {-64, 0}, {-59, -24}, {-45, -45}, {-24, -59}, {0, -64}, {24, -59}, {45, -45}, {59, -24}};
 
@@ -177,22 +179,6 @@ static void tone_later(uint32_t n, uint32_t ms)
     ui.due_note = (uint8_t)n;
     ui.tone_due = (fm1_ms + ms) | 1u;
 }
-/* the VETOR on the sound: a Lissajous (FAMILY 0) as large as fits, unturned, no moon (the sound is where the path
- * is), running free (no restart); its speed: 8 beats a round at the sound's tempo, x 0.2 .. x 25 */
-static void vec_apply(void)
-{
-    uint32_t c, v = vec.speed > VEC_SPEED_MAX ? VEC_SPEED_MAX : vec.speed;
-    if (!vec.on) {
-        orb_q8 = 256;
-        return;
-    }
-    pt.g[G_SHAPE] = 0, pt.g[G_WARPY] = vec.fx, pt.g[G_MORPH] = vec.fy, pt.g[G_WARPX] = vec.ph;
-    pt.g[G_SIZE] = 127, pt.g[G_ROT] = 0, pt.g[G_CX] = pt.g[G_CY] = 0, pt.g[G_SPIN] = 0;
-    pt.g[G_SUBSZ] = 0, pt.g[G_RETRIG] = 0, pt.g[G_RATE] = 2;
-    for (c = 0; c < NC; c++)
-        pt.c[c][CP_CUT] = (int16_t)clamp(base_cut[c] + vec.cut[c], 0, 127);
-    orb_q8 = (51u << (v >> 4)) * (256u + (v & 15u) * 16u) >> 8;
-}
 static void preset_load(uint32_t n)                /* the sound: factory sound n (also the USB console's "preset") */
 {
     ev_push(EV_ALLOFF, 0, 0);
@@ -208,7 +194,6 @@ static void preset_load(uint32_t n)                /* the sound: factory sound n
         for (c = 0; c < NC; c++)
             base_cut[c] = pt.c[c][CP_CUT];
     }
-    vec_apply();
 }
 static void say_num(const char *name, int32_t v)   /* "BRILHO 80" in the header */
 {
@@ -225,11 +210,14 @@ static void say_num(const char *name, int32_t v)   /* "BRILHO 80" in the header 
     ui_say(name, " ");
     str_cat(ui.msg, b, sizeof ui.msg);
 }
-static void sctl_say(const sctl_t *c) { say_num(c->name, c->corner ? pt.c[0][c->id] : pt.g[c->id]); }
+static void sctl_say(const sctl_t *c) { say_num(c->name, c->corner ? (c->id == CP_CUT ? base_cut[0] : pt.c[0][c->id]) : pt.g[c->id]); }
 static void sctl_set(const sctl_t *c, int32_t v, int rel)   /* rel: v is a change */
 {
     uint32_t k;
-    if (c->corner)
+    if (c->corner && c->id == CP_CUT)              /* (the brightness: the sound's own; the VETOR adds to it) */
+        for (k = 0; k < NC; k++)
+            base_cut[k] = (int16_t)clamp(rel ? base_cut[k] + v : v, 0, 127), pt.c[k][CP_CUT] = base_cut[k];
+    else if (c->corner)
         for (k = 0; k < NC; k++)
             pt.c[k][c->id] = (int16_t)clamp(rel ? pt.c[k][c->id] + v : v, CDESC[c->id].min, CDESC[c->id].max);
     else
@@ -299,10 +287,9 @@ static void lb_add(void)
 static void vec_load(void)
 {
     if (!(flash_ok && store_on && st_load(VEC_OBJ, &vec, sizeof vec) == (int)sizeof vec && vec.magic == VEC_MAGIC)) {
-        vec_t d = {VEC_MAGIC, 0, 48, -64, -39, 0, {0, 0, 0, 0}, 0};
+        vec_t d = VEC_DEFAULT;
         vec = d;
     }
-    vec.on &= 1u;
 }
 static void vec_knob(uint32_t k, int32_t s)        /* the VETOR's knobs: the figure, the corners, the speed */
 {
@@ -319,7 +306,7 @@ static void vec_knob(uint32_t k, int32_t s)        /* the VETOR's knobs: the fig
         vec.speed = (uint8_t)clamp((int32_t)vec.speed + s * 2, 0, VEC_SPEED_MAX);
         say_num(VEC_NAME[7], vec.speed);
     }
-    vec_apply();
+    ui.redraw |= D_BODY;
 }
 
 /* the mod wheel's lightning on the orbit: the sound's place jumps out from the path as a bolt does, piece by piece,
@@ -349,7 +336,31 @@ static void vbolt_tick(void)
         if (vb.tn < VB_TRAIL)
             vb.tr[vb.tn][0] = (int16_t)vb.x, vb.tr[vb.tn++][1] = (int16_t)vb.y;
     }
-    orb_dx = vb.x, orb_dy = vb.y;
+}
+
+/* the VETOR running: its point on the figure (as the engine draws a Lissajous: orbit.c), thrown about by the mod
+ * wheel's bolt; the corners' brightness blended there moves the sound's filter. Speed: 0.05 .. 6 rounds a second */
+static struct { uint32_t ph, t; int32_t x, y; } vp;
+static void vec_tick(void)
+{
+    uint32_t c, v = vec.speed > VEC_SPEED_MAX ? VEC_SPEED_MAX : vec.speed, dt = fm1_ms - vp.t;
+    uint32_t q8 = (51u << (v >> 4)) * (256u + (v & 15u) * 16u) >> 8;   /* x 0.2 .. x 25 of a round in 4 s */
+    int32_t x, y, w[NC], off = 0;
+    opar_t o;
+    if (dt == 0u)
+        return;
+    vp.t = fm1_ms;
+    vp.ph += (uint32_t)((uint64_t)(dt > 50u ? 50u : dt) * 1073741u * q8 >> 8);
+    memset(&o, 0, sizeof o);
+    o.wx = vec.ph * 256, o.wy = vec.fx * 256, o.mo = vec.fy * 256;
+    fam_xy(SH_LISSA, &o, vp.ph, &x, &y);
+    vp.x = clamp(x * 7 / 8 + vb.x, -32767, 32767), vp.y = clamp(y * 7 / 8 + vb.y, -32767, 32767);
+    orbit_weights(vp.x, vp.y, w, 2);
+    for (c = 0; c < NC; c++)
+        off += w[c] * vec.cut[c];
+    off >>= 15;
+    for (c = 0; c < NC; c++)
+        pt.c[c][CP_CUT] = (int16_t)clamp(base_cut[c] + off, 0, 127);
 }
 
 /* ------------------------------------------------------------- the lightning --- */
@@ -601,6 +612,7 @@ static void game_tick(void)
             vt = now / 33u, ui.redraw |= D_BODY;
     }
     vbolt_tick();
+    vec_tick();
     if (bolt.t && since(bolt.t) >= NR_OK_MS) {
         bolt.t = 0;
         ui.dirty = 1;                              /* (the last frame: without it) */
@@ -690,21 +702,7 @@ static void setup_turn(uint32_t row, int32_t d)
 static void vec_open(void)
 {
     vec_was = vec;
-    if (!vec.on) {
-        vec.on = 1;
-        vec_apply();
-    }
     enter(GS_VECTOR);
-}
-static void vec_toggle(void)
-{
-    vec.on ^= 1u;
-    if (vec.on)
-        vec_apply();
-    else
-        preset_load(SND[ui.set[SET_SOUND]]);       /* (the sound as it comes) */
-    ui_say(vec.on ? "VETOR LIGADO" : "VETOR DESLIGADO", 0);
-    ui.redraw |= D_BODY;
 }
 static void vec_close(void)
 {
@@ -763,9 +761,7 @@ static void buttons_poll(void)                     /* PLAY: home (the title), th
                 setup_turn(ui.sel, b == B_OCTDN ? -1 : 1);
             break;
         case GS_VECTOR:
-            if (b == B_PARA)
-                vec_toggle();
-            else if (b == B_PLAY)
+            if (b == B_PARA || b == B_PLAY)
                 vec_close();
             break;
         case GS_SOUND:
@@ -809,8 +805,8 @@ static void knobs_poll(void)                       /* the settings: K1..K4 its r
             continue;
         if (ui.gs == GS_SETUP && k < SET_N)
             setup_turn(k, s);
-        else if (vec.on && ui.gs != GS_SOUND)
-            vec_knob(k, s);                        /* (the VETOR on: the knobs are its) */
+        else if (ui.gs == GS_VECTOR)
+            vec_knob(k, s);                        /* (its screen: the knobs are the VETOR's) */
         else
             sctl_set(&KNOB[k], s * 2, 1);
     }
@@ -944,7 +940,7 @@ static void ui_leds(void)
     fm1_led_key(B_PLAY, ui.gs == GS_TITLE ? (now / 500u) & 1u : menu);   /* (the title: blinking; elsewhere: home) */
     fm1_led_key(B_GLOBE, ui.gs == GS_SETUP);
     fm1_led_key(B_PATCH, ui.gs == GS_SOUND);
-    fm1_led_key(B_PARA, vec.on);
+    fm1_led_key(B_PARA, ui.gs == GS_VECTOR);
     fm1_led_key(B_OCTDN, ui.gs == GS_SETUP || ui.gs == GS_NAME);
     fm1_led_key(B_OCTUP, ui.gs == GS_SETUP || ui.gs == GS_NAME);
 }

@@ -83,55 +83,66 @@ int main(void)
         preset_load(SND[0]);
     }
 
-    /* the VETOR (PARA) */
+    /* the VETOR (PARA): in, out; the brightness alone */
     {
-        int16_t c0 = base_cut[0];
-        uint32_t q = orb_q8;
+        patch_t was;
+        uint32_t c, k, other = 0;
+        int16_t aa;
+        panel_enc(2, 5); panel_ms(40);             /* (a PATCH setting first: kept through the VETOR) */
+        aa = pt.g[G_AA];
+        was = pt;
         btn(B_PARA);
-        CHECK(ui.gs == GS_VECTOR && vec.on && pt.g[G_SHAPE] == 0 && pt.g[G_RETRIG] == 0, "PARA: the VETOR, on, free running");
+        CHECK(ui.gs == GS_VECTOR, "PARA: the VETOR");
+        panel_ms(500);
+        CHECK(memcmp(&pt, &was, sizeof pt) == 0, "its corners at 0: the sound untouched");
         panel_enc(0, 5); panel_ms(40);
-        CHECK(pt.g[G_WARPY] == -54 && str_eq(ui.msg, "FREQ X 1.3"), "K1: FREQ X (%d, %s)", pt.g[G_WARPY], ui.msg);
+        CHECK(vec.fx == -54 && str_eq(ui.msg, "FREQ X 1.3"), "K1: FREQ X (%d, %s)", vec.fx, ui.msg);
         panel_enc(1, 13); panel_ms(40);
-        CHECK(pt.g[G_MORPH] == -13, "K2: FREQ Y (%d)", pt.g[G_MORPH]);
-        panel_enc(3, 5); panel_ms(40);
-        CHECK(pt.c[0][CP_CUT] == clamp(c0 + 10, 0, 127) && pt.c[1][CP_CUT] == base_cut[1], "K4: corner 1 alone");
+        CHECK(vec.fy == -13, "K2: FREQ Y (%d)", vec.fy);
+        panel_enc(3, 15); panel_ms(40);
+        CHECK(vec.cut[0] == 30 && str_eq(ui.msg, "BRILHO CANTO 1 30"), "K4: BRILHO CANTO 1 (%s)", ui.msg);
+        panel_enc(6, -15); panel_ms(40);
         panel_enc(7, 10); panel_ms(40);
-        CHECK(vec.speed == 68 && orb_q8 > q, "K8: faster (%d, %u)", vec.speed, orb_q8);
+        CHECK(vec.speed == 68, "K8: VELOCIDADE (%d)", vec.speed);
+        {   /* the brightness moves with the point; nothing else in the sound */
+            int32_t lo = 999, hi = -999;
+            for (i = 0; i < 80; i++) {
+                panel_ms(25);
+                lo = pt.c[0][CP_CUT] < lo ? pt.c[0][CP_CUT] : lo, hi = pt.c[0][CP_CUT] > hi ? pt.c[0][CP_CUT] : hi;
+                for (c = 0; c < NC; c++)
+                    for (k = 0; k < CP_N; k++)
+                        other += k != CP_CUT && pt.c[c][k] != was.c[c][k];
+                other += memcmp(pt.g, was.g, sizeof pt.g) != 0;
+            }
+            CHECK(hi - lo > 10, "the brightness follows the point (%d .. %d)", lo, hi);
+            CHECK(other == 0, "and nothing else changes (%u)", other);
+        }
         panel_wheel(1, 485); panel_ms(500);
+        CHECK(vb.x || vb.y, "the mod wheel: its bolt throws the point");
         shot("vector");
         panel_wheel(1, 615); panel_ms(800);
         btn(B_PARA);
-        CHECK(!vec.on && pt.g[G_RETRIG] == 1 && pt.c[0][CP_CUT] == c0 && orb_q8 == 256, "PARA: off, the sound as it comes");
-        btn(B_PARA);
-        CHECK(vec.on && pt.g[G_WARPY] == -54, "PARA: on again, as it was set");
-        btn(B_PLAY);
-        CHECK(ui.gs == GS_TITLE && vec.on, "PLAY: home, still on");
-        panel_ms(60);
-        shot("title-vector");
+        CHECK(ui.gs == GS_TITLE && pt.g[G_AA] == aa, "PARA again: out; the PATCH setting kept");
         panel_enc(0, 1); panel_ms(40);
-        CHECK(pt.g[G_WARPY] == -52, "on, on the title too the knobs are the VETOR's");
-        btn(B_PARA); btn(B_PARA); btn(B_PLAY);
-        CHECK(!vec.on, "off again");
+        CHECK(vec.fx == -54 && pt.c[0][CP_CUT] != 0, "out of it the knobs are the sound's again");
+        panel_enc(0, -1); panel_ms(40);
+        btn(B_PARA); btn(B_PLAY);
+        CHECK(ui.gs == GS_TITLE, "PLAY: out too");
     }
 
-    /* the PATCH screen: the sound's knobs, even with the VETOR on */
-    btn(B_PARA);
-    CHECK(vec.on, "VETOR on");
-    btn(B_PLAY);
+    /* the PATCH screen */
     btn(B_PATCH);
     CHECK(ui.gs == GS_SOUND, "PATCH: the sound");
     {
-        int16_t aa = pt.g[G_AA], wy = pt.g[G_WARPY];
+        int16_t aa = pt.g[G_AA];
         panel_enc(2, 10); panel_ms(40);
-        CHECK(pt.g[G_AA] == clamp(aa + 20, 0, 127) && pt.g[G_WARPY] == wy, "there K3 is ATAQUE, not the VETOR's");
+        CHECK(pt.g[G_AA] == clamp(aa + 20, 0, 127), "there K3 is ATAQUE");
         panel_enc(6, 10); panel_enc(7, 15); panel_ms(40);
         shot("sound");
         panel_enc(2, -10); panel_enc(6, -10); panel_enc(7, -15); panel_ms(40);
     }
     btn(B_PATCH);
     CHECK(ui.gs == GS_TITLE, "PATCH again: home");
-    btn(B_PARA); btn(B_PARA); btn(B_PLAY);
-    CHECK(!vec.on && ui.gs == GS_TITLE, "VETOR off again");
 
     /* the settings */
     btn(B_GLOBE);
@@ -151,9 +162,9 @@ int main(void)
     CHECK(ui.gs == GS_TITLE && voices() > 0, "on the title a key just plays (%d, %u)", ui.gs, voices());
     lift(12);
     {                                              /* the sound's controls */
-        int16_t cut = pt.c[0][CP_CUT], aa = pt.g[G_AA];
+        int16_t cut = base_cut[0], aa = pt.g[G_AA];
         panel_enc(0, 3); panel_ms(40);
-        CHECK(pt.c[0][CP_CUT] == clamp(cut + 6, 0, 127), "K1: BRILHO");
+        CHECK(base_cut[0] == clamp(cut + 6, 0, 127), "K1: BRILHO (the sound's own; the VETOR adds to it)");
         CHECK(str_eq(ui.msg, "BRILHO ") == 0 && ui.msg[0] == 'B', "K1 said in the header (%s)", ui.msg);
         panel_ms(60);
         shot("knob");
@@ -166,10 +177,10 @@ int main(void)
         panel_fader(0, 100); panel_ms(40);
         panel_wheel(1, 485); panel_ms(400);
         CHECK(ui.mod > 20000, "the mod wheel up (%d)", ui.mod);
-        { int32_t lo = 99999, hi = -99999; for (i = 0; i < 60; i++) { panel_ms(10); lo = orb_dx < lo ? orb_dx : lo; hi = orb_dx > hi ? orb_dx : hi; }
-          CHECK(hi - lo > 8000, "its lightning moves the orbit's place (%d..%d)", lo, hi); }
+        { int32_t lo = 99999, hi = -99999; for (i = 0; i < 60; i++) { panel_ms(10); lo = vb.x < lo ? vb.x : lo; hi = vb.x > hi ? vb.x : hi; }
+          CHECK(hi - lo > 8000, "its lightning throws the VETOR's point (%d..%d)", lo, hi); }
         panel_wheel(1, 615); panel_ms(800);
-        CHECK(ui.mod < 500 && orb_dx > -200 && orb_dx < 200, "mod wheel down: back on the path (%d, %d)", ui.mod, orb_dx);
+        CHECK(ui.mod < 500 && vb.x > -200 && vb.x < 200, "mod wheel down: back on the figure (%d, %d)", ui.mod, vb.x);
     }
     btn(B_PLAY);
     CHECK(ui.gs == GS_INTRO, "PLAY starts");
@@ -260,7 +271,7 @@ int main(void)
     shot("title-ranked");
     panel_init();                                  /* a power cycle: the ranking and the settings read back */
     CHECK(lb.e[0].score == 36 && lb.e[0].n[0] == 'B' && ui.set[SET_TIME] == 1, "kept over a power cycle");
-    CHECK(!vec.on && vec.fx == -52 && vec.speed == 68, "the VETOR kept too (%d %d %d)", vec.on, vec.fx, vec.speed);
+    CHECK(vec.fx == -54 && vec.cut[0] == 30 && vec.speed == 68, "the VETOR kept too (%d %d %d)", vec.fx, vec.cut[0], vec.speed);
     printf("%s (%d failures)\n", fails ? "FAILED" : "ok", fails);
     return fails != 0;
 }

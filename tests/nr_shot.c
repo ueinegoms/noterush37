@@ -100,19 +100,38 @@ int main(void)
         panel_wheel(1, 485); panel_ms(500);
         shot("vector");
         panel_wheel(1, 615); panel_ms(800);
-        btn(B_PLAY);
-        CHECK(!vec.on && pt.g[G_RETRIG] == 1 && pt.c[0][CP_CUT] == c0 && orb_q8 == 256, "PLAY: off, the sound as it comes");
-        btn(B_PLAY);
-        CHECK(vec.on && pt.g[G_WARPY] == -54, "PLAY: on again, as it was set");
         btn(B_PARA);
-        CHECK(ui.gs == GS_TITLE && vec.on, "PARA: out, still on");
+        CHECK(!vec.on && pt.g[G_RETRIG] == 1 && pt.c[0][CP_CUT] == c0 && orb_q8 == 256, "PARA: off, the sound as it comes");
+        btn(B_PARA);
+        CHECK(vec.on && pt.g[G_WARPY] == -54, "PARA: on again, as it was set");
+        btn(B_PLAY);
+        CHECK(ui.gs == GS_TITLE && vec.on, "PLAY: home, still on");
         panel_ms(60);
         shot("title-vector");
         panel_enc(0, 1); panel_ms(40);
         CHECK(pt.g[G_WARPY] == -52, "on, on the title too the knobs are the VETOR's");
-        btn(B_PARA); btn(B_PLAY); btn(B_PARA);
+        btn(B_PARA); btn(B_PARA); btn(B_PLAY);
         CHECK(!vec.on, "off again");
     }
+
+    /* the PATCH screen: the sound's knobs, even with the VETOR on */
+    btn(B_PARA);
+    CHECK(vec.on, "VETOR on");
+    btn(B_PLAY);
+    btn(B_PATCH);
+    CHECK(ui.gs == GS_SOUND, "PATCH: the sound");
+    {
+        int16_t aa = pt.g[G_AA], wy = pt.g[G_WARPY];
+        panel_enc(2, 10); panel_ms(40);
+        CHECK(pt.g[G_AA] == clamp(aa + 20, 0, 127) && pt.g[G_WARPY] == wy, "there K3 is ATAQUE, not the VETOR's");
+        panel_enc(6, 10); panel_enc(7, 15); panel_ms(40);
+        shot("sound");
+        panel_enc(2, -10); panel_enc(6, -10); panel_enc(7, -15); panel_ms(40);
+    }
+    btn(B_PATCH);
+    CHECK(ui.gs == GS_TITLE, "PATCH again: home");
+    btn(B_PARA); btn(B_PARA); btn(B_PLAY);
+    CHECK(!vec.on && ui.gs == GS_TITLE, "VETOR off again");
 
     /* the settings */
     btn(B_GLOBE);
@@ -203,7 +222,7 @@ int main(void)
     shot("board");
 
     /* with the time: PAUTA alone, 6 s */
-    btn(B_PATCH);
+    btn(B_PLAY);
     btn(B_GLOBE); btn(B_OCTUP); btn(B_GLOBE);
     btn(B_RIGHT); btn(B_RIGHT);
     CHECK(ui.mode == MODE_PAUTA, "mode PAUTA");
@@ -221,6 +240,8 @@ int main(void)
     key(5);
     CHECK(ui.gs == GS_BOARD, "the ranking: a key just plays");
     btn(B_PLAY);
+    CHECK(ui.gs == GS_TITLE, "PLAY: home");
+    btn(B_PLAY);
     CHECK(ui.gs == GS_INTRO, "PLAY: again");
     wait_gs(GS_ASK);
     panel_ms(6200);
@@ -234,7 +255,7 @@ int main(void)
         panel_ms(40);
         shot(i ? "staff-c6" : "staff-c3");
     }
-    btn(B_PATCH);
+    btn(B_PLAY);
     panel_ms(60);
     shot("title-ranked");
     panel_init();                                  /* a power cycle: the ranking and the settings read back */

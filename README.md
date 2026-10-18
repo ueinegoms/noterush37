@@ -14,13 +14,15 @@ The notes come in by octave: the middle one (C4 .. B4), then the upper (C5 .. C6
 answer: lightning in an arc from the bottom left corner to the combo, and across the pads (erratic, as a bolt); ball
 lightning round the combo while it runs. A wrong key or the time out: game over, a name (AAA) for the local top 5.
 
-The keys always play; they answer only when asked. SEQ PLAY does what the screen offers (JOGAR, ENVIAR, JOGAR DE
-NOVO, the note again); PATCH goes back. Title: < > the mode; GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the
+The keys always play; they answer only when asked. SEQ PLAY goes home: from any screen to the title, there it starts
+a game (naming the score: ENVIAR); a pad plays the OUVIDO note again. Title: < > the mode; PATCH: the sound (its eight
+knobs as on the keyboard, each drawn: the filter, the envelope, the drive, the room, the echoes); GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the
 web; SOM; NOTAS INICIAIS; ACERTOS/FASE). The sound: K1..K8 BRILHO, RESSONÂNCIA, ATAQUE, RELEASE, DRIVE, SALA, ECO
 TEMPO, ECO REPETE; the faders VOLUME, REVERB, DELAY, CHORUS; the pitch wheel a bend; the mod wheel lightning on the
 orbit (the sound's place jumps about as a bolt). PARA: the VETOR, the same for every sound: a Lissajous round the four
 corners, running free; on, the knobs are its (K1..K3 the figure: FREQ X, FREQ Y, FASE; K4..K7 each corner's
-brightness; K8 the speed). Off, every note starts the same (the same key, the same sound). The
+brightness; K8 the speed; on the PATCH screen the sound's own stay); PARA there switches it, PLAY goes home. Off,
+every note starts the same (the same key, the same sound). The
 simulator page installs it on the keyboard (CONECTAR, INSTALAR: Chrome / Edge).
 
 ```

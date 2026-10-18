@@ -193,7 +193,7 @@ static void question(uint16_t col)                 /* the question as asked: the
         note_head(125, note_step(ui.cur), ST_NX, col);
     } else {
         speaker(116, 100, C_YEL, ui.tone_off ? C_WHITE : C_YEL);
-        button(146, 28, "OUVIR NOTA (PLAY)", C_YEL, C_BOX);
+        button(146, 28, "OUVIR NOTA (PAD)", C_YEL, C_BOX);
     }
 }
 static void card_ask(void)
@@ -263,8 +263,7 @@ static void card_name(void)
         cv_rect(x, 156, 44, 20, C_BOX);
         text_c(x + 22, 158, &FONT_S, LBL[i], C_YEL);
     }
-    button(186, 26, "ENVIAR (PLAY)", C_YEL, C_BOX);
-    text_c(120, 216, &FONT_S, "PULAR (PATCH)", C_YEL);
+    button(192, 30, "ENVIAR (PLAY)", C_YEL, C_BOX);
 }
 static void lb_rows(int32_t y, uint32_t hl)
 {
@@ -287,7 +286,7 @@ static void card_board(void)
 {
     score_big();
     lb_rows(98, ui.rank);
-    button(194, 30, "JOGAR DE NOVO (PLAY)", C_YEL, C_BOX);
+    button(194, 30, "IN\xCD" "CIO (PLAY)", C_YEL, C_BOX);
 }
 /* the VETOR (PARA): the square of the four corners, the path as it is now, the sound's place on it (the dot), and the
  * mod wheel's lightning: its trail from the path out to the dot */
@@ -302,7 +301,6 @@ static void card_vector(void)
     int32_t i, x, y, px = 0, py = 0, bx, by;
     uint32_t c;
     card_title(vec.on ? "VETOR LISSAJOUS - LIGADO" : "VETOR LISSAJOUS - DESLIGADO");
-    cv_rect(VX0, VY0, VW, VW, C_BOX);
     for (i = 0; i <= 128; i++) {                   /* the path, 128 pieces round */
         orbit_path((uint32_t)i << 25, 0, &x, &y);
         orbit_place_spin(&x, &y, 0);
@@ -324,7 +322,108 @@ static void card_vector(void)
     }
     ellipse(vx(syn.gx), vy(syn.gy), 4, 4, vec.on ? C_YEL : C_MUT);
     text_c(120, 208, &FONT_S, "K1-3 FORMA K4-7 CANTO K8 VEL", C_MUT);
-    text_c(120, 222, &FONT_S, vec.on ? "PLAY DESLIGA  PARA SAI" : "PLAY LIGA  PARA SAI", C_YEL);
+    text_c(120, 222, &FONT_S, vec.on ? "PARA DESLIGA  PLAY VOLTA" : "PARA LIGA  PLAY VOLTA", C_YEL);
+}
+/* the PATCH screen: the sound's eight knobs as they sit on the keyboard, K1 .. K8 left to right, a column each (a dial
+ * and its value); over each pair what it does, drawn in 1 px lines: the filter's curve (BRILHO, RESSONANCIA), the
+ * envelope (ATAQUE, RELEASE), the wave driven (DRIVE), the room's tail (SALA), the echoes (ECO TEMPO, ECO REPETE).
+ * The knob turned last lit */
+#define SP_Y0 70                                   /* the drawings: rows 70 .. 128 */
+#define SP_H 58
+#define SK_Y 154                                   /* the dials' centre */
+static int32_t kcol(uint32_t k) { return 8 + (int32_t)k * 28; }   /* knob k's column, 28 wide */
+static void circle(int32_t cx, int32_t cy, int32_t r, uint16_t c)   /* 1 px round, midpoint */
+{
+    int32_t x = r, y = 0, e = 1 - r;
+    while (x >= y) {
+        cv_pset(cx + x, cy + y, c), cv_pset(cx - x, cy + y, c), cv_pset(cx + x, cy - y, c), cv_pset(cx - x, cy - y, c);
+        cv_pset(cx + y, cy + x, c), cv_pset(cx - y, cy + x, c), cv_pset(cx + y, cy - x, c), cv_pset(cx - y, cy - x, c);
+        y++;
+        if (e < 0)
+            e += 2 * y + 1;
+        else
+            x--, e += 2 * (y - x) + 1;
+    }
+}
+static void sp_filter(int32_t x0, int32_t w, uint16_t c)   /* flat, a bump at the cutoff (resonance), then down */
+{
+    int32_t cut = pt.c[0][CP_CUT], res = pt.c[0][CP_RES], fc = cut * (w - 1) / 127, x, px = 0, py = 0, bot = SP_Y0 + SP_H;
+    for (x = 0; x < w; x++) {
+        int32_t d = x - fc, lv = SP_H * 3 / 5, bump = res * (SP_H / 3) / 127, k = d < 0 ? -d : d, y;
+        if (k < 7)
+            lv += bump * (7 - k) / 7;
+        if (d > 0)
+            lv -= d * 3;
+        y = bot - clamp(lv, 0, SP_H);
+        if (x)
+            cv_line(x0 + px, py, x0 + x, y, c);
+        px = x, py = y;
+    }
+}
+static void sp_env(int32_t x0, int32_t w, uint16_t c)      /* attack, decay, the sustain held, release */
+{
+    int32_t bot = SP_Y0 + SP_H, top = SP_Y0 + 2, sus = bot - pt.g[G_AS] * (SP_H - 4) / 127;
+    int32_t a = 2 + pt.g[G_AA] * 15 / 127, d = 2 + pt.g[G_AD] * 9 / 127, r = 2 + pt.g[G_AR] * 15 / 127;
+    int32_t h = clamp(w - 1 - a - d - r, 4, 20), x1 = x0 + a, x2 = x1 + d, x3 = x2 + h, x4 = x3 + r;
+    cv_line(x0, bot, x1, top, c);
+    cv_line(x1, top, x2, sus, c);
+    cv_line(x2, sus, x3, sus, c);
+    cv_line(x3, sus, x4, bot, c);
+}
+static void sp_drive(int32_t x0, int32_t w, uint16_t c)    /* a sine, squared off the more it is driven */
+{
+    int32_t x, px = 0, py = 0, g = 256 + pt.g[G_DRIVE] * 12, mid = SP_Y0 + SP_H / 2;
+    for (x = 0; x < w; x++) {
+        int32_t v = clamp((sinq((uint32_t)x * (0xFFFFFFFFu / (uint32_t)(w - 1))) * g) >> 8, -32767, 32767);
+        int32_t y = mid - v * (SP_H / 2 - 4) / 32767;
+        if (x)
+            cv_line(x0 + px, py, x0 + x, y, c);
+        px = x, py = y;
+    }
+}
+static void sp_room(int32_t x0, int32_t w, uint16_t c)     /* the tail: ticks dying away, longer the bigger the room */
+{
+    int32_t n = 3 + pt.g[G_RVSIZE] * (w / 2 - 3) / 127, i, bot = SP_Y0 + SP_H;
+    for (i = 0; i < n; i++) {
+        int32_t h = (SP_H - 6) * (n - i) / n, j = (int32_t)((uint32_t)(i * 2654435761u) >> 29);   /* (scattered) */
+        cv_line(x0 + i * 2, bot, x0 + i * 2, bot - h + j * h / 16, c);
+    }
+}
+static void sp_echo(int32_t x0, int32_t w, uint16_t c)     /* the note, then its echoes: apart by ECO TEMPO, each */
+{                                                          /* softer by ECO REPETE */
+    int32_t gap = 4 + pt.g[G_DLTIME] * 14 / 127, h = SP_H - 4, x, bot = SP_Y0 + SP_H;
+    for (x = x0 + 1; x < x0 + w && h > 1; x += gap) {
+        cv_line(x, bot, x, bot - h, c);
+        cv_line(x - 1, bot - h, x + 1, bot - h, c);
+        h = h * (20 + pt.g[G_DLFB]) / 160;
+    }
+}
+static void card_sound(void)
+{
+    static const char *const LBL[8] = {"BRI", "RES", "ATQ", "REL", "DRV", "SAL", "ECO", "REP"};
+    char b[24];
+    uint32_t k, lit = ui.kturn && since(ui.kturn_t) < 2500u ? ui.kturn : 0u;
+    str_cpy(b, "SOM: ", sizeof b);
+    str_cat(b, SND_NAME[ui.set[SET_SOUND]], sizeof b);
+    card_title(b);
+    sp_filter(kcol(0), 54, lit == 1u || lit == 2u ? C_YEL : C_STAFF);
+    sp_env(kcol(2), 54, lit == 3u || lit == 4u ? C_YEL : C_STAFF);
+    sp_drive(kcol(4), 26, lit == 5u ? C_YEL : C_STAFF);
+    sp_room(kcol(5) + 1, 26, lit == 6u ? C_YEL : C_STAFF);
+    sp_echo(kcol(6), 54, lit == 7u || lit == 8u ? C_YEL : C_STAFF);
+    for (k = 0; k < 8u; k++) {                     /* the dials: -135 .. +135 degrees */
+        const sctl_t *c = &KNOB[k];
+        int32_t v = c->corner ? pt.c[0][c->id] : pt.g[c->id], lo = c->corner ? CDESC[c->id].min : GDESC[c->id].min;
+        int32_t hi = c->corner ? CDESC[c->id].max : GDESC[c->id].max, cx = kcol(k) + 14;
+        uint32_t ph = (uint32_t)(((int64_t)(v - lo) * 270 / (hi - lo) - 135) * 11930465);   /* (degrees x 2^32 / 360) */
+        uint16_t col = lit == k + 1u ? C_YEL : C_STAFF;
+        circle(cx, SK_Y, 11, col);
+        cv_line(cx, SK_Y, cx + (sinq(ph) * 10 >> 15), SK_Y - (cosq(ph) * 10 >> 15), col);
+        text_c(cx, 170, &FONT_S, LBL[k], lit == k + 1u ? C_YEL : C_MUT);
+        num(b, (uint32_t)(v < 0 ? -v : v));
+        text_c(cx, 186, &FONT_S, b, lit == k + 1u ? C_YEL : C_WHITE);
+    }
+    text_c(120, 212, &FONT_S, "FADERS: VOL REV DLY CHO", C_MUT);
 }
 static void card_setup(void)
 {
@@ -346,7 +445,7 @@ static void card_setup(void)
         text_r(CARD_X + CARD_W - 10, y, &FONT_S, v, C_YEL);
     }
     text_c(120, 186, &FONT_S, "< > ESCOLHE  K1/OCT MUDA", C_MUT);
-    text_c(120, 210, &FONT_S, "GLOBE: SALVAR E SAIR", C_YEL);
+    text_c(120, 210, &FONT_S, "GLOBE OU PLAY: SALVAR", C_YEL);
 }
 static void title(void)                            /* the web's home: the ranking, the logo, JOGAR */
 {
@@ -377,7 +476,7 @@ static void title(void)                            /* the web's home: the rankin
         str_cat(b, MODE_NAME[ui.mode], sizeof b);
         str_cat(b, " >  GLOBE: CONFIG", sizeof b);
         text_c(120, 209, &FONT_S, b, C_MUT);
-        text_c(120, 224, &FONT_S, vec.on ? "PARA: VETOR (LIGADO)" : "PARA: VETOR", vec.on ? C_YEL : C_MUT);
+        text_c(120, 224, &FONT_S, vec.on ? "PATCH: SOM  PARA: VETOR ON" : "PATCH: SOM  PARA: VETOR", vec.on ? C_YEL : C_MUT);
     }
 }
 static void bolts(void)                            /* the lightning over everything (game.c: lightning): 1 px of */
@@ -428,6 +527,7 @@ static void scene(void)
         case GS_BOARD: card_board(); break;
         case GS_SETUP: card_setup(); break;
         case GS_VECTOR: card_vector(); break;
+        case GS_SOUND: card_sound(); break;
         }
     }
     if (bolt.t)

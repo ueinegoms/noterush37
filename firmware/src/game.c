@@ -10,14 +10,15 @@
  * (ACERTOS) move to the next phase; after OUVIDO a new note: the middle octave C4 .. B4 first, then the upper one
  * C5 .. C6, the lower one C3 .. B3 last. A wrong key, or the time out (TEMPO; SEM LIMITE: none): game over, a name
  * (AAA) for the local ranking (top 5, in flash).
- * The keys always play (the sound chosen in the settings); they answer only when asked. SEQ PLAY does what the
- * screen offers (JOGAR, ENVIAR, JOGAR DE NOVO, the OUVIDO note again: a pad too); PATCH goes back. Title: < > the
- * mode; GLOBE: the settings (TEMPO, SOM, NOTAS INICIAIS, ACERTOS/FASE: < > the row, K1..K4 or OCT- OCT+ the value).
- * The name: OCT+ OCT- the letter, < > the place. The sound: K1..K8 its parameters, the faders VOLUME, REVERB, DELAY,
- * CHORUS, the pitch wheel a bend, the mod wheel lightning on the orbit (the sound's place jumps about as a bolt).
- * PARA: the VETOR, the same for every sound: a Lissajous path round the four corners, running free (a note sounds
- * where the path is); while it is on the knobs are its: K1 K2 K3 the figure (FREQ X, FREQ Y, FASE), K4..K7 each
- * corner's brightness, K8 its speed. PLAY there switches it on / off. */
+ * The keys always play (the sound chosen in the settings); they answer only when asked. SEQ PLAY goes home: from any
+ * screen to the title, on the title it starts a game (the name: ENVIAR); a pad plays the OUVIDO note again. Title:
+ * < > the mode; GLOBE: the settings (TEMPO, SOM, NOTAS INICIAIS, ACERTOS/FASE: < > the row, K1..K4 or OCT- OCT+ the
+ * value); PATCH: the sound (K1..K8 its parameters, drawn); PARA: the VETOR. The name: OCT+ OCT- the letter, < > the
+ * place. The sound everywhere: K1..K8 (or the VETOR's), the faders VOLUME, REVERB, DELAY, CHORUS, the pitch wheel a
+ * bend, the mod wheel lightning on the orbit (the sound's place jumps about as a bolt).
+ * The VETOR, the same for every sound: a Lissajous path round the four corners, running free (a note sounds where the
+ * path is); while it is on the knobs are its (but on the PATCH screen): K1 K2 K3 the figure (FREQ X, FREQ Y, FASE),
+ * K4..K7 each corner's brightness, K8 its speed. PARA there switches it on / off. */
 #if !BOARD_SMK37
 #error "NOTE RUSH 37 is for the SMK-37 (Pro / Elite / MKE-P37)"
 #endif
@@ -34,7 +35,7 @@ enum { B_KNOBBANK, B_FADERBANK, B_LEFT, B_RIGHT, B_OCTDN, B_OCTUP, B_ARP, B_REPE
 #define NR_KEY0 48                                 /* the bottom key: C3 */
 #define NR_LB 5u                                   /* the ranking's places */
 
-enum { GS_TITLE, GS_INTRO, GS_ASK, GS_OK, GS_OVER, GS_NAME, GS_BOARD, GS_SETUP, GS_VECTOR };
+enum { GS_TITLE, GS_INTRO, GS_ASK, GS_OK, GS_OVER, GS_NAME, GS_BOARD, GS_SETUP, GS_VECTOR, GS_SOUND };
 enum { PH_NOME, PH_PAUTA, PH_OUVIDO, PH_N };
 enum { MODE_ALL, MODE_NOME, MODE_PAUTA, MODE_OUVIDO, MODE_N };
 enum { WHY_KEY = 1, WHY_TIME };
@@ -72,8 +73,8 @@ static const sctl_t FADER[4] = {{"VOLUME", 0, G_VOLUME}, {"REVERB", 0, G_RVMIX},
 #define VEC_MAGIC 0x4E525631u                      /* "NRV1" */
 typedef struct { uint32_t magic; uint8_t on, speed; int8_t fx, fy, ph, cut[NC]; uint8_t rsv; } vec_t;
 static vec_t vec = {VEC_MAGIC, 0, 48, -64, -39, 0, {0, 0, 0, 0}, 0}, vec_was;   /* (a figure eight) */
-static const char *const VEC_NAME[8] = {"FREQ X", "FREQ Y", "FASE", "CANTO 1", "CANTO 2", "CANTO 3", "CANTO 4",
-                                        "VELOCIDADE"};
+static const char *const VEC_NAME[8] = {"FREQ X", "FREQ Y", "FASE", "BRILHO CANTO 1", "BRILHO CANTO 2",
+                                        "BRILHO CANTO 3", "BRILHO CANTO 4", "VELOCIDADE"};
 #define VEC_SPEED_MAX 112
 static int16_t base_cut[NC];                       /* the sound's own corner cutoffs */
 static const int8_t DIR16[16][2] = {{64, 0}, {59, 24}, {45, 45}, {24, 59}, {0, 64}, {-24, 59}, {-45, 45}, {-59, 24},
@@ -112,6 +113,8 @@ static struct {
     uint8_t tone_note, due_note;
     uint64_t keys;
     uint32_t flash_t;                              /* game over's red, from */
+    uint8_t kturn;                                 /* the sound's knob turned last (+1: the PATCH screen lights it) */
+    uint32_t kturn_t;
     int32_t bend, mod;                             /* the pitch wheel (Q15), the mod wheel (0 .. 32767) */
     uint8_t fad[4], fad_ready;                     /* the faders as last taken */
     uint32_t rnd;
@@ -232,6 +235,8 @@ static void sctl_set(const sctl_t *c, int32_t v, int rel)   /* rel: v is a chang
     else
         pt.g[c->id] = (int16_t)clamp(rel ? pt.g[c->id] + v : v, GDESC[c->id].min, GDESC[c->id].max);
     sctl_say(c);
+    if (c >= KNOB && c < KNOB + 8)                 /* (a knob: the PATCH screen lights it, draws it anew) */
+        ui.kturn = (uint8_t)(c - KNOB + 1), ui.kturn_t = fm1_ms | 1u, ui.redraw |= D_BODY;
 }
 
 /* ------------------------------------------------------------- settings, ranking --- */
@@ -707,6 +712,7 @@ static void vec_close(void)
         st_save(VEC_OBJ, &vec, sizeof vec);
     to_title();
 }
+static void sound_open(void) { ui.kturn = 0; enter(GS_SOUND); }
 static void replay(void)
 {
     if (ui.gs == GS_ASK && ui.phase == PH_OUVIDO)
@@ -741,15 +747,15 @@ static void keys_poll(void)                        /* the keys always play; aske
                 ev_push(EV_OFF, n, 0);
         }
 }
-static void buttons_poll(void)
-{
+static void buttons_poll(void)                     /* PLAY: home (the title), there: a game; PATCH, GLOBE, PARA: */
+{                                                  /* their screens (outside a game) */
     uint32_t rel, pr = fm1_input_edges(&rel), b;
     for (b = 0; b < FM1_NBTN; b++) {
         if (!((pr >> b) & 1u))
             continue;
         switch (ui.gs) {
         case GS_SETUP:
-            if (b == B_GLOBE || b == B_PATCH)
+            if (b == B_GLOBE || b == B_PLAY)
                 setup_close();
             else if (b == B_LEFT || b == B_RIGHT)
                 ui.sel = (uint8_t)((ui.sel + SET_N + (b == B_LEFT ? -1 : 1)) % SET_N), ui.redraw |= D_BODY;
@@ -757,10 +763,14 @@ static void buttons_poll(void)
                 setup_turn(ui.sel, b == B_OCTDN ? -1 : 1);
             break;
         case GS_VECTOR:
-            if (b == B_PARA || b == B_PATCH)
-                vec_close();
-            else if (b == B_PLAY)
+            if (b == B_PARA)
                 vec_toggle();
+            else if (b == B_PLAY)
+                vec_close();
+            break;
+        case GS_SOUND:
+            if (b == B_PATCH || b == B_PLAY)
+                to_title();
             break;
         case GS_NAME:
             if (b == B_OCTUP || b == B_OCTDN)
@@ -769,24 +779,23 @@ static void buttons_poll(void)
                 ui.sel = (uint8_t)((ui.sel + 3u + (b == B_LEFT ? -1 : 1)) % 3u), ui.redraw |= D_BODY;
             else if (b == B_PLAY)
                 name_done(1);
-            else if (b == B_PATCH)
-                name_done(0);
             break;
         default:
-            if (b == B_PATCH)
-                to_title();
-            else if (b == B_GLOBE && (ui.gs == GS_TITLE || ui.gs == GS_BOARD))
+            if (b == B_PLAY) {
+                if (ui.gs == GS_TITLE)
+                    game_start();
+                else if (ui.gs != GS_OVER)
+                    to_title();                    /* (the ranking, or a game left) */
+            } else if (ui.gs != GS_TITLE && ui.gs != GS_BOARD)
+                break;                             /* (in a game: the keys, the pads) */
+            else if (b == B_GLOBE)
                 setup_open();
-            else if (b == B_PARA && (ui.gs == GS_TITLE || ui.gs == GS_BOARD))
+            else if (b == B_PARA)
                 vec_open();
+            else if (b == B_PATCH)
+                sound_open();
             else if (ui.gs == GS_TITLE && (b == B_LEFT || b == B_RIGHT))
                 mode_step(b == B_LEFT ? -1 : 1);
-            else if (b == B_PLAY) {
-                if (ui.gs == GS_TITLE || ui.gs == GS_BOARD)
-                    game_start();
-                else
-                    replay();
-            }
             break;
         }
     }
@@ -800,7 +809,7 @@ static void knobs_poll(void)                       /* the settings: K1..K4 its r
             continue;
         if (ui.gs == GS_SETUP && k < SET_N)
             setup_turn(k, s);
-        else if (vec.on)
+        else if (vec.on && ui.gs != GS_SOUND)
             vec_knob(k, s);                        /* (the VETOR on: the knobs are its) */
         else
             sctl_set(&KNOB[k], s * 2, 1);
@@ -932,10 +941,9 @@ static void ui_leds(void)
     }
     fm1_led_key(B_LEFT, ui.gs == GS_TITLE || ui.gs == GS_SETUP || ui.gs == GS_NAME);
     fm1_led_key(B_RIGHT, ui.gs == GS_TITLE || ui.gs == GS_SETUP || ui.gs == GS_NAME);
-    fm1_led_key(B_PLAY, ((ui.gs == GS_TITLE || ui.gs == GS_BOARD || ui.gs == GS_NAME) && (now / 500u) & 1u)
-                        || (ui.gs == GS_ASK && ui.phase == PH_OUVIDO));
-    fm1_led_key(B_GLOBE, ui.gs == GS_SETUP || ((ui.gs == GS_TITLE || ui.gs == GS_BOARD) && !((now / 500u) & 1u)));
-    fm1_led_key(B_PATCH, ui.gs != GS_TITLE);
+    fm1_led_key(B_PLAY, ui.gs == GS_TITLE ? (now / 500u) & 1u : menu);   /* (the title: blinking; elsewhere: home) */
+    fm1_led_key(B_GLOBE, ui.gs == GS_SETUP);
+    fm1_led_key(B_PATCH, ui.gs == GS_SOUND);
     fm1_led_key(B_PARA, vec.on);
     fm1_led_key(B_OCTDN, ui.gs == GS_SETUP || ui.gs == GS_NAME);
     fm1_led_key(B_OCTUP, ui.gs == GS_SETUP || ui.gs == GS_NAME);

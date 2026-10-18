@@ -60,6 +60,8 @@ static struct { uint32_t magic; lb_ent_t e[NR_LB]; } lb;
 
 #define D_HEAD 1u                                  /* the screen's strips (gdraw.c) */
 #define D_BAR 2u
+#define D_MID 4u                                   /* (the card's upper half) */
+#define BALL_MS 70u                                /* the ball lightning round the combo: a new set this often */
 #define D_BODY 12u
 #define D_FOOT 16u
 #define D_ALL 31u
@@ -203,8 +205,8 @@ static void lb_add(void)
 }
 
 /* ------------------------------------------------------------- the lightning --- */
-/* as the web's (lightning.js): from the key played to the combo; as many bolts as the phase's points; brighter,
- * longer and wider the quicker the answer (1 s or less: full, 5 s or more: none) */
+/* as the web's (lightning.js): from points spread along the bottom edge up to the combo; as many bolts as the
+ * phase's points; longer and more jagged the quicker the answer (1 s or less: full, 5 s or more: none) */
 static int32_t isqrt(int32_t v)
 {
     int32_t r = 0, b = 1 << 14;
@@ -219,16 +221,7 @@ static int32_t isqrt(int32_t v)
     }
     return r;
 }
-static int32_t key_x(uint32_t n)                   /* the key's place along the screen's width */
-{
-    static const uint8_t WI[12] = {0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6};   /* (a black key: by its white one) */
-    int32_t k = (int32_t)n - NR_KEY0, w;
-    if (k < 0 || k > 36)
-        return 120;
-    w = (k / 12) * 7 + WI[k % 12];
-    return 8 + w * 224 / 21;
-}
-static void lightning(uint32_t n, uint32_t react_ms)
+static void lightning(uint32_t react_ms)
 {
     int32_t k = react_ms <= 1000u ? 256 : react_ms >= 5000u ? 0 : 256 - (int32_t)(react_ms - 1000u) * 256 / 4000;
     int32_t base = 7 + (41 * k >> 8), steps = 5 + (15 * k >> 8);
@@ -239,7 +232,8 @@ static void lightning(uint32_t n, uint32_t react_ms)
     bolt.k = (uint8_t)(k > 255 ? 255 : k);
     bolt.n = ui.gain > NBOLT ? NBOLT : ui.gain;
     for (b = 0; b < bolt.n; b++) {
-        int32_t cx = key_x(n), cy = 238, tx = 210 + (int32_t)(rnd() % 17u) - 8, ty = 17 + (int32_t)(rnd() % 9u) - 4;
+        int32_t cx = (int32_t)((2u * b + 1u) * 120u / bolt.n) + (int32_t)(rnd() % 31u) - 15, cy = 239;
+        int32_t tx = 210 + (int32_t)(rnd() % 17u) - 8, ty = 17 + (int32_t)(rnd() % 9u) - 4;
         int32_t dx = 0, dy = -256, i;
         uint32_t np = 0;
         bolt.p[b][np][0] = (int16_t)cx, bolt.p[b][np++][1] = (int16_t)cy;
@@ -321,13 +315,13 @@ static void next(void)                             /* after a right answer */
     }
     ask();
 }
-static void hit(uint32_t n)
+static void hit(void)
 {
     ui.gain = PHASE_BONUS[ui.phase];
     ui.combo = (uint16_t)(ui.combo + ui.gain);
     ui.streak++;
     ui.flash_t = fm1_ms | 1u;
-    lightning(n, fm1_ms - ui.ask_t);
+    lightning(fm1_ms - ui.ask_t);
     enter(GS_OK);
 }
 static void miss(uint32_t why, uint32_t played)
@@ -359,7 +353,7 @@ static void game_key(uint32_t n)                   /* a key pressed (the keybed,
         game_start();
     else if (ui.gs == GS_ASK) {
         if (answer_ok(n))
-            hit(n);
+            hit();
         else
             miss(WHY_KEY, n);
     }
@@ -383,6 +377,16 @@ static void game_tick(void)
     if (ui.msg[0] && (int32_t)(now - ui.msg_until) >= 0) {
         ui.msg[0] = 0;
         ui.dirty = 1;
+    }
+    {                                              /* the ball lightning: the combo in play, the score being named */
+        static uint32_t ball;
+        if (now / BALL_MS != ball) {
+            ball = now / BALL_MS;
+            if (ui.gs == GS_NAME)
+                ui.redraw |= D_MID;
+            else if (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK)
+                ui.redraw |= D_HEAD;
+        }
     }
     if (bolt.t && since(bolt.t) >= NR_OK_MS) {
         bolt.t = 0;

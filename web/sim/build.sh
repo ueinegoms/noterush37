@@ -18,5 +18,8 @@ else                                   # (no Emscripten: clang and wasm-ld alone
         -Wl,--no-entry -Wl,--export-dynamic -Wl,--initial-memory=33554432 -Wl,-z,stack-size=1048576 \
         -o build/sim/sim.wasm web/sim/sim.c
 fi
-cp web/sim/index.html web/sim/worklet.js build/sim/
+cp web/sim/index.html web/sim/worklet.js web/sim/install.js build/sim/
+for f in build/noterush37.fwsc build/noterush37-elite.fwsc build/noterush37-mke.fwsc; do   # (the installer's packages:
+    [ -f "$f" ] && cp "$f" build/sim/                                                        # MODEL=pro / elite / mke sh build.sh)
+done
 echo "sim: build/sim ($(wc -c < build/sim/sim.wasm | tr -d ' ') B wasm)"

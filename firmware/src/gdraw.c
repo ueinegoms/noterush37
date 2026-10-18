@@ -22,6 +22,7 @@ static const uint16_t STRIP_Y[6] = {0, 34, 42, 122, 202, 240};
 #define CARD_W 228
 #define CARD_H 194
 static int32_t strip_y0, strip_y1;
+static void ball(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint32_t n, int32_t y0, int32_t y1);
 
 static void text_b(int32_t x, int32_t y, const felucca_font_t *f, const char *s, uint16_t c)   /* bold, as the web */
 {
@@ -167,6 +168,10 @@ static void header(void)
     text_b(8, 10, &FONT_S, "NOTE RUSH", C_WHITE);
     b[0] = 'x';
     num(b + 1, ui.combo);
+    if (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK) {   /* a combo running: its ball lightning */
+        int32_t w = text_w(&FONT_L, b);
+        ball(232 - w / 2, 17, w / 2 + 10, 16, 2u + (ui.combo / 8u > 4u ? 4u : ui.combo / 8u), 1, 32);
+    }
     text_r(232, 1, &FONT_L, b, C_YEL);
 }
 static void clock_bar(void)                        /* as the web's: shown only while a question's time runs */
@@ -244,6 +249,10 @@ static void card_name(void)
 {
     static const char *const LBL[4] = {"OCT+", "OCT-", "<", ">"};
     uint32_t i;
+    char b[12];
+    b[0] = 'x';
+    num(b + 1, ui.combo);
+    ball(120, CARD_Y + 32, text_w(&FONT_XL, b) / 2 + 22, 28, 7, CARD_Y + 2, 100);
     score_big();
     for (i = 0; i < 3u; i++) {                     /* the letters: the one being set plain, the others boxed */
         char s[2] = {ui.name[i], 0};
@@ -333,20 +342,44 @@ static void title(void)                            /* the web's home: the rankin
     str_cat(b, " >  GLOBE: CONFIG", sizeof b);
     text_c(120, 216, &FONT_S, b, C_MUT);
 }
-static void bolts(void)                            /* the lightning over everything (game.c: lightning) */
-{
-    uint32_t t = since(bolt.t), b, i, n;
-    uint32_t a = t <= 200u ? 256u : t >= NR_OK_MS ? 0u : 256u - (t - 200u) * 256u / (NR_OK_MS - 200u);
-    uint16_t core = mix(C_YEL, C_CARD, a * (128u + bolt.k / 2u) >> 8), glow = mix(C_YEL, C_CARD, a * bolt.k >> 9);
+static void bolts(void)                            /* the lightning over everything (game.c: lightning): 1 px of */
+{                                                  /* plain yellow, jagged; it runs up in 0.2 s, then draws back */
+    uint32_t t = since(bolt.t), b, i;                /* into the combo */
     for (b = 0; b < bolt.n; b++) {
-        n = t >= 200u ? bolt.np[b] : (bolt.np[b] * t + 199u) / 200u;   /* (it runs out to the combo in 0.2 s) */
-        for (i = 1; i < n && i < bolt.np[b]; i++) {
-            const int16_t *p = bolt.p[b][i - 1u], *q = bolt.p[b][i];
-            if (bolt.k > 96u) {                    /* (a quick answer: wider, a glow) */
-                cv_line(p[0] + 1, p[1], q[0] + 1, q[1], glow);
-                cv_line(p[0] - 1, p[1], q[0] - 1, q[1], glow);
-            }
-            cv_line(p[0], p[1], q[0], q[1], core);
+        uint32_t np = bolt.np[b], n = t >= 200u ? np : (np * t + 199u) / 200u;
+        uint32_t i0 = t <= 200u ? 0u : (np - 1u) * (t - 200u) / (NR_OK_MS - 200u);
+        for (i = i0 + 1u; i < n; i++)
+            cv_line(bolt.p[b][i - 1u][0], bolt.p[b][i - 1u][1], bolt.p[b][i][0], bolt.p[b][i][1], C_YEL);
+    }
+}
+/* ball lightning (as Path of Exile's, its bolts only): n jagged bolts out from the middle of a number, a new set every
+ * BALL_MS; the same set in every strip (its own random, seeded by the time), kept within rows y0 .. y1 */
+static const int8_t DIR16[16][2] = {{64, 0}, {59, 24}, {45, 45}, {24, 59}, {0, 64}, {-24, 59}, {-45, 45}, {-59, 24},
+                                    {-64, 0}, {-59, -24}, {-45, -45}, {-24, -59}, {0, -64}, {24, -59}, {45, -45}, {59, -24}};
+static uint32_t ball_r;
+static uint32_t br(void)
+{
+    ball_r ^= ball_r << 13;
+    ball_r ^= ball_r >> 17;
+    ball_r ^= ball_r << 5;
+    return ball_r;
+}
+static void ball(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint32_t n, int32_t y0, int32_t y1)
+{
+    uint32_t i, k;
+    ball_r = (fm1_ms / BALL_MS) * 2654435761u | 1u;
+    for (i = 0; i < n; i++) {
+        const int8_t *d = DIR16[br() % 16u];
+        int32_t f = 52 + (int32_t)(br() % 24u);    /* (its reach: 0.8 .. 1.2 of the radius) */
+        int32_t ex = cx + d[0] * rx * f / 4096, ey = cy + d[1] * ry * f / 4096;
+        int32_t px = cx + (int32_t)(br() % 7u) - 3, py = cy + (int32_t)(br() % 5u) - 2, sx = px, sy = py;
+        for (k = 1; k <= 4u; k++) {                /* four pieces, each bent off the straight way */
+            int32_t qx = sx + (ex - sx) * (int32_t)k / 4, qy = sy + (ey - sy) * (int32_t)k / 4;
+            if (k < 4u)
+                qx += (int32_t)(br() % 9u) - 4, qy += (int32_t)(br() % 7u) - 3;
+            qy = clamp(qy, y0, y1);
+            cv_line(px, py, qx, qy, C_YEL);
+            px = qx, py = qy;
         }
     }
 }

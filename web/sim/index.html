@@ -74,6 +74,19 @@
     .knob .dial { width: 34px; height: 34px; } .knob .dial::after { height: 11px; transform-origin: 50% 14px; }
     .pad { height: 40px; margin: 0 2px; } .grid6 { grid-template-columns: repeat(6, minmax(48px, 1fr)); }
     .blk, .rgt, .mid { width: 100%; } .top { justify-content: center; } }
+  /* the installer: the web version's buttons (yellow, dark text) */
+  .inst { max-width: 1500px; margin: 6px auto 0; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px;
+          background: var(--line); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: #fff;
+          font: 13px/1.35 "JetBrains Mono", ui-monospace, monospace; }
+  .inst h2 { margin: 0; font-size: 14px; letter-spacing: 2px; color: #fff; }
+  .inst button { font: 800 13px "JetBrains Mono", ui-monospace, monospace; letter-spacing: 1px; padding: 9px 16px; border: 0;
+                 background: #FFFF5E; color: #22126A; cursor: pointer; }
+  .inst button:disabled { opacity: .35; cursor: default; }
+  .inst label { color: var(--dim); font-size: 12px; }
+  #idev { flex: 1 1 320px; min-width: 0; }
+  #idev b { color: #FFFF5E; }
+  #ibar { flex: 1 1 100%; height: 6px; background: #1B0093; display: none; }
+  #ibar i { display: block; height: 100%; width: 0; background: #00FF88; }
   #start { position: fixed; inset: 0; background: #000c; display: flex; align-items: center; justify-content: center;
            font-size: 22px; cursor: pointer; z-index: 10; color: var(--cy); text-shadow: 0 0 10px var(--cy); }
   .help { max-width: 1100px; margin: 8px auto 30px; padding: 0 16px; color: var(--dim); }
@@ -82,6 +95,14 @@
 <body>
 <header><h1>NOTE RUSH 37</h1><span>simulador · o firmware do SMK-37 Elite rodando no browser (fork do Vector37)</span>
   <span id="status"></span></header>
+<div class="inst">
+  <h2>INSTALAR NO TECLADO</h2>
+  <button id="iconn" type="button">CONECTAR</button>
+  <button id="igo" type="button" disabled>INSTALAR</button>
+  <label><input type="checkbox" id="iall"> procurar em todas as portas MIDI</label>
+  <span id="idev">Ligue o SMK-37 por USB (cabo de dados) e clique em CONECTAR. Chrome ou Edge.</span>
+  <div id="ibar"><i></i></div>
+</div>
 <div class="smk">
   <div class="top">
     <div class="blk">
@@ -103,6 +124,7 @@
   (guardado neste browser, como o teclado guarda na flash). PATCH volta ao título. Os pads são o medidor de combo.
   Teclado do computador: A W S E D F T G Y H U J K = teclas (começa no C4), Z / X = oitava; setas, Enter, Esc, C = botões. Um teclado MIDI também toca.</div>
 <div id="start">clique pra ligar o som</div>
+<script src="install.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 let node = null;
@@ -281,6 +303,70 @@ function storeKeep(buf) {
     localStorage.setItem(STORE_KEY, btoa(s));
   } catch (e) { /* (no storage here: the sounds last until the page closes) */ }
 }
+
+// ---- the installer (install.js): find the keyboard, show what it runs, install the package for its model
+let idev = null, ipkg = null, ibusy = false;
+const isay = (h) => { $("idev").innerHTML = h; };
+const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+function runs(id) {                                    // what an identity says the keyboard runs
+  const v = +id.text.split("_")[1];
+  if (id.loader) return "em modo de update (uma instalação não terminou)";
+  return v >= 700 ? "um firmware alternativo (Vector37, NOTE RUSH 37 e afins)" : "o firmware de fábrica da M-Vave";
+}
+async function midiAccess() {
+  if (!navigator.requestMIDIAccess) throw new Error("este navegador não tem Web MIDI: abra no Chrome ou no Edge");
+  try { return await navigator.requestMIDIAccess({ sysex: true }); }
+  catch (e) { throw new Error("permissão de MIDI (SysEx) negada: libere nas configurações do site e tente de novo"); }
+}
+$("iconn").addEventListener("click", async () => {
+  if (ibusy) return;
+  ibusy = true; $("igo").disabled = true;
+  if (idev) { idev.link.close(); idev = null; }
+  try {
+    isay("procurando o teclado…");
+    const access = await midiAccess(), midi = NR37Install.webMidi(access);
+    idev = await NR37Install.find(midi, null, $("iall").checked);
+    if (!idev) {
+      const names = midi.inputs().map((p) => p.name);
+      isay("Nenhum SMK-37 respondeu (cabo USB de dados? outro programa usando a porta?). Portas MIDI: " +
+           esc(names.length ? names.join(", ") : "nenhuma"));
+      return;
+    }
+    ipkg = NR37Install.packageFor(idev.id.text);
+    isay(`Conectado: <b>${esc(idev.id.text)}</b> na porta ${esc(idev.name)}, rodando ${runs(idev.id)}. ` +
+         (ipkg ? `Pacote: ${ipkg}.` : "Este modelo não é um SMK-37 Pro / Elite / MKE-P37: não dá pra instalar."));
+    $("igo").disabled = !ipkg;
+  } catch (e) { isay("Erro: " + esc(e.message)); }
+  finally { ibusy = false; }
+});
+$("igo").addEventListener("click", async () => {
+  if (ibusy || !idev || !ipkg) return;
+  if (!confirm(`Instalar NOTE RUSH 37 (${ipkg}) no ${idev.id.text}?\n\nFirmware não oficial, por sua conta e risco. ` +
+               "Não desconecte o cabo durante a gravação. Isso apaga os dados salvos de outro firmware no teclado.\n" +
+               "Pra voltar: instale o firmware de fábrica (ou outro) pelo site do genkigenki. Resgate: segure OCT- ao ligar."))
+    return;
+  ibusy = true; $("iconn").disabled = $("igo").disabled = true;
+  const bar = $("ibar"), fill = bar.firstElementChild;
+  bar.style.display = "block"; fill.style.width = "0";
+  try {
+    isay("baixando o pacote…");
+    const raw = new Uint8Array(await (await fetch(ipkg)).arrayBuffer()), pkg = NR37Install.loadPackage(raw);
+    const access = await midiAccess(), midi = NR37Install.webMidi(access);
+    const done = await NR37Install.install(midi, idev, pkg, (k, v) => {
+      if (k === "start") isay(`começando o update em ${esc(v)}…`);
+      else if (k === "check") isay(`o teclado está conferindo o pacote (${v} leituras)…`);
+      else if (k === "loader") isay("trocando pro modo de update (a porta MIDI reconecta)…");
+      else if (k === "write") { isay(`gravando ${v}%… não desconecte`); fill.style.width = v + "%"; }
+      else if (k === "reboot") isay("reiniciando o teclado…");
+    });
+    isay(`Pronto: o teclado agora roda <b>${esc(done)}</b> (NOTE RUSH 37). Divirta-se!`);
+  } catch (e) {
+    isay("Erro: " + esc(e.message) + (e.code === "lost" || e.code === "noloader"
+      ? " — se o teclado ficou em modo de update, clique em CONECTAR e INSTALAR de novo: a gravação termina." : ""));
+  } finally {
+    idev = null; ibusy = false; $("iconn").disabled = false; $("igo").disabled = true;
+  }
+});
 
 $("start").addEventListener("click", async () => {
   $("start").textContent = "carregando…";

@@ -1,13 +1,13 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
      Copyright (C) 2026 M. Geisler (makkuro) -->
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vector37 simulator</title>
+<title>NOTE RUSH 37</title>
 <style>
-  :root { --bg: #02030c; --cy: #5096ff; --mg: #6effa0; --dim: #6f7c9a; --line: #1d2a5a; }
+  :root { --bg: #02030c; --cy: #00f0ff; --mg: #ff28c8; --dim: #6f7c9a; --line: #1d2a5a; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--cy); font: 13px/1.3 system-ui, sans-serif; user-select: none;
          -webkit-user-select: none; touch-action: manipulation; }
@@ -80,7 +80,7 @@
 </style>
 </head>
 <body>
-<header><h1>VECTOR37</h1><span>simulator · the firmware's engine and screen in the browser · PATCH = the sounds · KNOB BANK = the guide</span>
+<header><h1>NOTE RUSH 37</h1><span>simulador · o firmware do SMK-37 Elite rodando no browser (fork do Vector37)</span>
   <span id="status"></span></header>
 <div class="smk">
   <div class="top">
@@ -94,14 +94,14 @@
   </div>
   <div class="keys" id="keys"></div>
 </div>
-<div class="help">Laid out like the SMK-37 Pro: wheels, the screen with its six buttons, K1..K8 over the 16 pads, the faders
-  over the 2 x 6 buttons, the keys below. The pads are four groups of 2 x 2: in each group the four pads are the four
-  corners, as on the screen (SELECT, MODE, FILTER, MUTE). No planet selected (a SELECT pad tapped again): the knobs are the orbit. CHORD, FX, FADER BANK, ARP: a click opens the knob set, another click closes it (held while turning a knob with the
-  scroll wheel: only while held). PATCH opens the sound list: three banks of sixteen (FACTORY, USER, FACTORY 2; &lt; &gt; or
-  K1 the others), one sound a pad; tap a pad: that sound; hold a pad 1 s: SAVE the sound as it is now into that USER slot
-  (kept in this browser, as the unit keeps it over power-off). BT: the SETUP set. Computer keyboard: 1–8 = top pads, A W S E D F T G Y H U J K = keys, Z / X = octave.
-  A MIDI keyboard plays the keys. The control map: docs/CONTROLS.md.</div>
-<div id="start">click to start the sound</div>
+<div class="help">O painel do SMK-37: a tela, os botões, K1..K8 sobre os 16 pads, os faders, as teclas (DÓ3..DÓ6).
+  <b>Título:</b> &lt; &gt; ou K1 escolhem o modo (TODAS, NOME, PAUTA, OUVIDO); uma tecla ou SEQ PLAY começa.
+  <b>NOME:</b> toque a nota escrita, em qualquer oitava. <b>PAUTA:</b> toque exatamente a tecla da pauta (DÓ4 = a tecla do meio).
+  <b>OUVIDO:</b> toque a nota que soou, qualquer oitava (SEQ PLAY ou um pad repete). 3 acertos seguidos passam de fase;
+  depois de OUVIDO entra uma nota nova. Errou ou 6 s sem tocar: fim. PATCH volta ao título. Os pads são o medidor de combo;
+  o recorde fica guardado (neste browser, como o teclado guarda na flash).
+  Teclado do computador: A W S E D F T G Y H U J K = teclas (começa no DÓ4), Z / X = oitava. Um teclado MIDI também toca.</div>
+<div id="start">clique pra ligar o som</div>
 <script>
 const $ = (id) => document.getElementById(id);
 let node = null;
@@ -120,11 +120,11 @@ function drawFb(fb) {
 }
 
 // ---- buttons (HAL ids): SMK name, what it does in Vector37 (held: the knobs' set)
-const BTN = [["KNOB BANK", "GUIDE"], ["FADER BANK", "MORE set"], ["<", "sound · list: bank"], [">", "sound · list: bank"],
-  ["OCTAVE-", "octave"], ["OCTAVE+", "octave"], ["ARP", "ARP set"], ["NOTE REPEAT", "RESTART"], ["SCALE", "WAVE set"],
-  ["CHORD", "VOICE set"], ["GLOBE", "FOCUS · held off"], ["BT", "SETUP set"], ["PATCH", "SOUNDS · 2x notes off"],
-  ["PARA", "RANDOM · held UNDO"], ["FX", "MIXER set"], ["SEQ", "FREEZE"], ["SEQ PLAY", "TAP tempo"],
-  ["SEQ REC", "LATCH"]];
+const BTN = [["KNOB BANK", ""], ["FADER BANK", ""], ["<", "modo"], [">", "modo"],
+  ["OCTAVE-", ""], ["OCTAVE+", ""], ["ARP", ""], ["NOTE REPEAT", ""], ["SCALE", ""],
+  ["CHORD", ""], ["GLOBE", ""], ["BT", ""], ["PATCH", "menu"],
+  ["PARA", ""], ["FX", ""], ["SEQ", ""], ["SEQ PLAY", "jogar · repetir"],
+  ["SEQ REC", ""]];
 const btnEl = [];
 function button(b, parent) {
   const el = mk("btn", `${BTN[b][0]}<small>${BTN[b][1]}</small>`);
@@ -137,7 +137,7 @@ function button(b, parent) {
 [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].forEach((b) => button(b, $("grid6")));   // under the faders, 2 x 6
 
 // ---- knobs K1..K8 (HAL encoders 0..7): the selected planets (none selected: the orbit and the moon)
-const KN = ["GEN 1", "GEN 2", "TUNE 2", "BLEND", "MODE", "CUTOFF", "RESO", "LEVEL"];
+const KN = ["MODO", "", "", "", "", "", "", ""];
 const KC = ["#ff5a5a", "#ffa03c", "#f0e146", "#64e16e", "#3cd2e6", "#5a8cff", "#be6eff", "#ff6ec8"];   // the knobs' colours (screen labels, satellites)
 const GC = ["#3c8cff", "#ff961e", "#aa5aff", "#ff3c6e"];   // the pad groups: SELECT, MODE, FILTER, MUTE
 for (let e = 0; e < 8; e++) {
@@ -157,7 +157,7 @@ for (let e = 0; e < 8; e++) {
 const padEl = [], GN = ["SELECT", "MODE", "FILTER", "MUTE"];
 for (let p = 0; p < 16; p++) {
   const g = (p & 7) >> 1, c = (p & 1) + (p >= 8 ? 2 : 0) + 1;
-  const el = mk("pad", `<i>${c}${(p & 1) || p >= 8 ? "" : " " + GN[g]}</i>`);
+  const el = mk("pad", "");
   el.style.setProperty("--c", GC[g] + "88");
   el.addEventListener("pointerdown", (ev) => { el.setPointerCapture(ev.pointerId); send({ type: "pad", pad: p, vel: ev.shiftKey ? 40 : 110 }); });
   el.addEventListener("pointerup", () => send({ type: "pad", pad: p, vel: 0 }));
@@ -245,14 +245,14 @@ function frame(m) {
     padEl[p].style.boxShadow = lit ? `0 0 16px ${col}` : "";
   });
   if (m.leds !== undefined) btnEl.forEach((el, b) => el && el.classList.toggle("lit", !!((m.leds >> b) & 1)));
-  if (m.ctl) m.ctl.forEach((v, i) => {                  // the faders and the mod wheel where the sound's values are
+  if (false) [].forEach((v, i) => {                  // the faders and the mod wheel where the sound's values are
     const el = i < 4 ? faderEl[i] : $("mod");
     if (!holding[i] && +el.value !== v) el.value = v;
   });
 }
 
 // ---- the store (your USER sounds, the settings): the simulated flash's data area, kept in this browser
-const STORE_KEY = "vector37-store";
+const STORE_KEY = "noterush37-store";
 function storeLoad() {
   try {
     const t = /fresh/.test(location.search) ? null : localStorage.getItem(STORE_KEY);   // (?fresh: as a new unit)
@@ -272,18 +272,18 @@ function storeKeep(buf) {
 }
 
 $("start").addEventListener("click", async () => {
-  $("start").textContent = "loading…";
+  $("start").textContent = "carregando…";
   try {
     const ac = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
     await ac.audioWorklet.addModule("worklet.js");
-    node = new AudioWorkletNode(ac, "vector37", { numberOfInputs: 0, outputChannelCount: [2] });
+    node = new AudioWorkletNode(ac, "noterush37", { numberOfInputs: 0, outputChannelCount: [2] });
     node.connect(ac.destination);
     node.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === "frame") frame(m);
       else if (m.type === "ready") {
         $("start").remove();
-        $("status").textContent = "running · " + ac.sampleRate + " Hz";
+        $("status").textContent = "rodando · " + ac.sampleRate + " Hz";
         if (/demo/.test(location.search)) {           // (a test: a chord)
           [12, 16, 19].forEach((k) => keyDown(k, 1));
         }

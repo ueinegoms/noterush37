@@ -1,3 +1,29 @@
+# NOTE RUSH 37
+
+**NOTE RUSH CYBERFUNK on the M-Vave SMK-37 Elite** (and the Pro / MKE-P37: the same keyboard): the note-reading game
+as firmware, a fork of Vector37 by genkigenki: its board layer, synth engine (the notes sound as E.PIANO) and
+simulator; the game in `firmware/src/game.c` and `gdraw.c` in place of Vector37's `ui.c` and `draw.c`.
+
+- **NOME**: the name on the screen (DÓ .. SI): play it, any octave (+3)
+- **PAUTA**: the note on the treble staff (DÓ4 .. DÓ6): play that very key (+4)
+- **OUVIDO**: the note heard: play it, any octave (+5)
+
+Three right in a row: the next phase; after OUVIDO a new note (centre-out from SI4, 3 at the start). A wrong key or
+6 s: game over. Title: < > or K1 the mode (TODAS, NOME, PAUTA, OUVIDO), a key or SEQ PLAY starts; PATCH: the title.
+The pads are the combo meter; the record is kept in flash.
+
+```
+MODEL=elite sh build.sh            # build/noterush37-elite.fwsc (JieLi toolchain + AC79 SDK V1.2.1, see below)
+python tools/fm1_install.py --yes build/noterush37-elite.fwsc
+sh web/sim/build.sh                # the simulator (Emscripten, or clang + wasm-ld): build/sim
+python3 -m http.server -d build/sim 8737
+cc -O1 -Ibuild/gen -o build/nr_shot tests/nr_shot.c && build/nr_shot   # the game's rules + screenshots
+```
+
+Unofficial firmware, untested on a unit yet. Rescue: hold OCT- while switching on. Vector37's own README follows.
+
+---
+
 <p align="center"><img src="docs/img/readme-banner.png" width="100%" alt="Vector37: an orbiting overtone synth for the SMK-37, its orbit screen"></p>
 
 # Vector37

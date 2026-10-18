@@ -22,8 +22,9 @@ FONTS = Path(__file__).resolve().parents[1] / "assets" / "fonts"
 # (name, file, px, scale, pixel, first, last): pixel fonts are rendered without
 # anti-aliasing at their design size and enlarged by an integer factor
 SIZES = [("S", "ter-u16n.bdf", 16, 1, True, 32, 255),   # Latin-1 (Hügelton needs the umlaut)
-         ("L", "ter-u16n.bdf", 16, 2, True, 32, 95),    # values / titles: digits, signs, capitals
-         ("XL", "ter-u16n.bdf", 16, 3, True, 32, 95)]   # big values (the same bitmaps at 3x)
+         ("L", "ter-u16n.bdf", 16, 2, True, 32, 255),   # NOTE RUSH: Latin-1 at every size (DÓ, RÉ, FÁ, LÁ, OUÇA)
+         ("XL", "ter-u16n.bdf", 16, 3, True, 32, 255),  # big values (the same bitmaps at 3x)
+         ("XXL", "ter-u16n.bdf", 16, 4, True, 32, 255)] # the note's name (4x)
 PAD = 2
 
 

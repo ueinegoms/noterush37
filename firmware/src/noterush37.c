@@ -1,15 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
  * Vector37: Copyright (C) 2026 M. Geisler (makkuro) */
-/* Vector37, an orbiting overtone synth for the M-Vave SMK-37 Pro: one compilation unit (the HAL is
- * header-only; board layer from SLOOP / Felucca). Order matters.
+/* NOTE RUSH 37: the note-reading game of NOTE RUSH CYBERFUNK for the M-Vave SMK-37 (Pro / Elite / MKE-P37), a fork
+ * of Vector37: its board layer and synth engine, the game in ui.c's and draw.c's place (game.c, gdraw.c). One
+ * compilation unit (the HAL is header-only; board layer from SLOOP / Felucca). Order matters.
  * BOARD_SMK37 1: the SMK-37 (build.py, the default); 0: the FM-1 (BOARD=fm1, experimental: its panel is
  * panel_fm1.c, no store, MASTER a pot, no TRS MIDI OUT). */
 #include <stdint.h>
-#define MK_VERSION "0.3.1"
-#define BRAND_NAME "VECTOR37"
-#define BRAND_CRASH "VECTOR37 CRASH"
-#define BRAND_RESCUE "VECTOR37 USB RESCUE"
+#define MK_VERSION "0.1.0"
+#define BRAND_NAME "NOTE RUSH 37"
+#define BRAND_CRASH "NOTE RUSH CRASH"
+#define BRAND_RESCUE "NOTE RUSH USB RESCUE"
 #if BOARD_SMK37
 #define SMK_PAD_EVENTS 1             /* the pads are gate buttons, not note keys (smk_input.h) */
 #endif
@@ -122,7 +123,7 @@ static int flash_probe(void)             /* the JEDEC id matches (scenes.c: pers
     irq_restore(f);
     return ok;
 }
-#define FELUCCA_DATA_FAMILY "VECTOR"     /* owner tag SMK37DATAVECTOR */
+#define FELUCCA_DATA_FAMILY "NRUSH"      /* owner tag SMK37DATANRUSH */
 #define FELUCCA_DATA_UNTAGGED_OK 0
 #include "storage.c"
 #include "scenes.c"
@@ -190,8 +191,8 @@ static void ota_commit(const uint8_t *parm)
     fm1_enter_update(parm);                             /* record into RAM, core reset (fm1_sys.h) */
 }
 
-#include "ui.c"
-#include "draw.c"
+#include "game.c"           /* NOTE RUSH 37: the game */
+#include "gdraw.c"          /* ... its screen */
 #include "console.c"
 #include "recovery.c"        /* early, polled USB updater; no synth or settings */
 #include "main.c"

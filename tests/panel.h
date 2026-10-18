@@ -22,7 +22,7 @@
 #ifndef MK_VERSION
 #define MK_VERSION "host"
 #endif
-#define BRAND_NAME "VECTOR37"
+#define BRAND_NAME "NOTE RUSH 37"
 #define RING_PUBLISH() ((void)0)
 static uint32_t fm1_ms;
 
@@ -187,12 +187,12 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
         panel_nor[off + i] &= ((const uint8_t *)src)[i];
     return 0;
 }
-#define FELUCCA_DATA_FAMILY "VECTOR"
+#define FELUCCA_DATA_FAMILY "NRUSH"
 #define FELUCCA_DATA_UNTAGGED_OK 0
 #include "../firmware/src/storage.c"
 #include "../firmware/src/scenes.c"
-#include "../firmware/src/ui.c"
-#include "../firmware/src/draw.c"
+#include "../firmware/src/game.c"
+#include "../firmware/src/gdraw.c"
 
 /* ---- the clock ---- */
 static int32_t pblk[2 * CTL];

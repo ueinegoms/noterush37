@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 M. Geisler (makkuro)
-// Vector37 in an AudioWorklet: sim.wasm is the firmware's engine, UI and screen against a simulated SMK-37 Pro.
+// NOTE RUSH 37 (on Vector37) in an AudioWorklet: sim.wasm is the firmware's engine, UI and screen against a simulated SMK-37 Pro.
 // Each render quantum runs the device's clock; ~30 times a second the screen, the pads and the LEDs go out; once a
 // second, if the store (your sounds, the settings) changed, its bytes go to the page to keep.
 class Vector37 extends AudioWorkletProcessor {
@@ -68,7 +68,6 @@ class Vector37 extends AudioWorkletProcessor {
     }
     msg.pads = Array.from(new Uint32Array(mem, ex.sim_pads(), 16));
     msg.leds = ex.sim_leds();
-    msg.ctl = [0, 1, 2, 3, 4].map((i) => ex.sim_ctl(i));   // (the faders' and the mod wheel's places: the values)
     this.port.postMessage(msg, tr);
   }
   process(inputs, outputs) {
@@ -89,4 +88,4 @@ class Vector37 extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor("vector37", Vector37);
+registerProcessor("noterush37", Vector37);

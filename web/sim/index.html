@@ -107,7 +107,7 @@
   <div class="top">
     <div class="blk">
       <div><input class="v w" id="pitch" type="range" min="450" max="630" value="540"><div class="lab">PITCH</div></div>
-      <div><input class="v w" id="mod" type="range" min="0" max="130" value="0"><div class="lab">VIBRATO</div></div>
+      <div><input class="v w" id="mod" type="range" min="0" max="130" value="0"><div class="lab">RAIO</div></div>
       <div class="scr"><canvas id="screen" width="240" height="240"></canvas><div class="nav" id="nav"></div></div>
     </div>
     <div class="mid" id="mid"></div>
@@ -119,13 +119,15 @@
   As teclas sempre tocam; só respondem quando há pergunta. <b>SEQ PLAY</b> faz a ação da tela (jogar, enviar, de novo,
   ouvir de novo); <b>PATCH</b> volta. <b>Título:</b> &lt; &gt; escolhem o modo (TODAS, NOME, PAUTA, OUVIDO).
   <b>GLOBE:</b> configurações (tempo, som, notas iniciais, acertos por fase; &lt; &gt; a linha, OCT/K1..K4 o valor).
-  <b>Som:</b> K1..K8 os parâmetros, os faders volume/reverb/delay/chorus, MOD vibrato, PITCH bend.
+  <b>Som:</b> K1..K8 os parâmetros, os faders volume/reverb/delay/chorus, PITCH bend, MOD o raio no vetor (o lugar do som
+  pula como um raio). <b>PARA:</b> o VETOR, igual pra todo som: um Lissajous pelos 4 cantos rodando livre; ligado, os knobs são
+  dele (K1–K3 a figura, K4–K7 o brilho de cada canto, K8 a velocidade); PLAY liga/desliga, PARA sai.
   As notas entram pela oitava do meio (C4..B4), depois a de cima (C5..C6), por fim a de baixo (C3..B3).
   <b>NOME:</b> toque a letra (C..B), em qualquer oitava. <b>PAUTA:</b> toque exatamente a tecla da pauta (C4 = a tecla do meio).
   <b>OUVIDO:</b> toque a nota que soou, qualquer oitava (SEQ PLAY ou um pad repete). 3 acertos seguidos passam de fase;
   depois de OUVIDO entra uma nota nova. Errou ou o tempo acabou: fim, e o nome (OCT▲▼, &lt; &gt;, PLAY envia) vai pro ranking
   (guardado neste browser, como o teclado guarda na flash). PATCH volta ao título. Os pads são o medidor de combo.
-  Teclado do computador: A W S E D F T G Y H U J K = teclas (começa no C4), Z / X = oitava; setas, Enter, Esc, C = botões. Um teclado MIDI também toca.</div>
+  Teclado do computador: A W S E D F T G Y H U J K = teclas (começa no C4), Z / X = oitava; setas, Enter, Esc, C, V = botões. Um teclado MIDI também toca.</div>
 <div id="start">clique pra ligar o som</div>
 <script src="install.js"></script>
 <script>
@@ -149,7 +151,7 @@ function drawFb(fb) {
 const BTN = [["KNOB BANK", ""], ["FADER BANK", ""], ["<", "modo · ← "], [">", "modo · →"],
   ["OCTAVE-", "▼ · ↓"], ["OCTAVE+", "▲ · ↑"], ["ARP", ""], ["NOTE REPEAT", ""], ["SCALE", ""],
   ["CHORD", ""], ["GLOBE", "config · C"], ["BT", ""], ["PATCH", "menu · Esc"],
-  ["PARA", ""], ["FX", ""], ["SEQ", ""], ["SEQ PLAY", "jogar · Enter"],
+  ["PARA", "vetor · V"], ["FX", ""], ["SEQ", ""], ["SEQ PLAY", "jogar · Enter"],
   ["SEQ REC", ""]];
 const btnEl = [];
 function button(b, parent) {
@@ -248,8 +250,8 @@ function keyDown(k, d) {                               // the keys every 16 ms, 
   keyEl[k].classList.toggle("down", !!d); send({ type: "key", key: k, down: d });
 }
 const KB = "awsedftgyhujk", held = {};
-// the buttons from the computer keyboard: arrows (< > OCT- OCT+), Enter (PLAY), Esc (PATCH), C (GLOBE)
-const NAV = { ArrowLeft: 2, ArrowRight: 3, ArrowDown: 4, ArrowUp: 5, Enter: 16, Escape: 12, c: 10, C: 10 };
+// the buttons from the computer keyboard: arrows (< > OCT- OCT+), Enter (PLAY), Esc (PATCH), C (GLOBE), V (PARA)
+const NAV = { ArrowLeft: 2, ArrowRight: 3, ArrowDown: 4, ArrowUp: 5, Enter: 16, Escape: 12, c: 10, C: 10, v: 13, V: 13 };
 let kbo = 12;
 addEventListener("keydown", (ev) => {
   if (ev.repeat || ev.ctrlKey || ev.metaKey) return;

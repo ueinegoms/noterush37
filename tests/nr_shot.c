@@ -83,6 +83,37 @@ int main(void)
         preset_load(SND[0]);
     }
 
+    /* the VETOR (PARA) */
+    {
+        int16_t c0 = base_cut[0];
+        uint32_t q = orb_q8;
+        btn(B_PARA);
+        CHECK(ui.gs == GS_VECTOR && vec.on && pt.g[G_SHAPE] == 0 && pt.g[G_RETRIG] == 0, "PARA: the VETOR, on, free running");
+        panel_enc(0, 5); panel_ms(40);
+        CHECK(pt.g[G_WARPY] == -54 && str_eq(ui.msg, "FREQ X 1.3"), "K1: FREQ X (%d, %s)", pt.g[G_WARPY], ui.msg);
+        panel_enc(1, 13); panel_ms(40);
+        CHECK(pt.g[G_MORPH] == -13, "K2: FREQ Y (%d)", pt.g[G_MORPH]);
+        panel_enc(3, 5); panel_ms(40);
+        CHECK(pt.c[0][CP_CUT] == clamp(c0 + 10, 0, 127) && pt.c[1][CP_CUT] == base_cut[1], "K4: corner 1 alone");
+        panel_enc(7, 10); panel_ms(40);
+        CHECK(vec.speed == 68 && orb_q8 > q, "K8: faster (%d, %u)", vec.speed, orb_q8);
+        panel_wheel(1, 485); panel_ms(500);
+        shot("vector");
+        panel_wheel(1, 615); panel_ms(800);
+        btn(B_PLAY);
+        CHECK(!vec.on && pt.g[G_RETRIG] == 1 && pt.c[0][CP_CUT] == c0 && orb_q8 == 256, "PLAY: off, the sound as it comes");
+        btn(B_PLAY);
+        CHECK(vec.on && pt.g[G_WARPY] == -54, "PLAY: on again, as it was set");
+        btn(B_PARA);
+        CHECK(ui.gs == GS_TITLE && vec.on, "PARA: out, still on");
+        panel_ms(60);
+        shot("title-vector");
+        panel_enc(0, 1); panel_ms(40);
+        CHECK(pt.g[G_WARPY] == -52, "on, on the title too the knobs are the VETOR's");
+        btn(B_PARA); btn(B_PLAY); btn(B_PARA);
+        CHECK(!vec.on, "off again");
+    }
+
     /* the settings */
     btn(B_GLOBE);
     CHECK(ui.gs == GS_SETUP, "GLOBE: the settings");
@@ -115,11 +146,11 @@ int main(void)
         CHECK(pt.g[G_RVMIX] == 90, "F2: REVERB");
         panel_fader(0, 100); panel_ms(40);
         panel_wheel(1, 485); panel_ms(400);
-        CHECK(ui.vib > 20000, "the mod wheel: vibrato (%d)", ui.vib);
-        { int32_t lo = 99999, hi = -99999; for (i = 0; i < 40; i++) { panel_ms(5); lo = joy_x < lo ? joy_x : lo; hi = joy_x > hi ? joy_x : hi; }
-          CHECK(hi - lo > 4000, "vibrato moves the pitch (%d..%d)", lo, hi); }
-        panel_wheel(1, 615); panel_ms(600);
-        CHECK(ui.vib < 500, "mod wheel down: none (%d)", ui.vib);
+        CHECK(ui.mod > 20000, "the mod wheel up (%d)", ui.mod);
+        { int32_t lo = 99999, hi = -99999; for (i = 0; i < 60; i++) { panel_ms(10); lo = orb_dx < lo ? orb_dx : lo; hi = orb_dx > hi ? orb_dx : hi; }
+          CHECK(hi - lo > 8000, "its lightning moves the orbit's place (%d..%d)", lo, hi); }
+        panel_wheel(1, 615); panel_ms(800);
+        CHECK(ui.mod < 500 && orb_dx > -200 && orb_dx < 200, "mod wheel down: back on the path (%d, %d)", ui.mod, orb_dx);
     }
     btn(B_PLAY);
     CHECK(ui.gs == GS_INTRO, "PLAY starts");
@@ -208,6 +239,7 @@ int main(void)
     shot("title-ranked");
     panel_init();                                  /* a power cycle: the ranking and the settings read back */
     CHECK(lb.e[0].score == 36 && lb.e[0].n[0] == 'B' && ui.set[SET_TIME] == 1, "kept over a power cycle");
+    CHECK(!vec.on && vec.fx == -52 && vec.speed == 68, "the VETOR kept too (%d %d %d)", vec.on, vec.fx, vec.speed);
     printf("%s (%d failures)\n", fails ? "FAILED" : "ok", fails);
     return fails != 0;
 }

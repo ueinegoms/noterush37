@@ -18,7 +18,7 @@ static void synth_tick(void)
         int32_t x, y;
         orbit_path(syn.oph, 0x55555555u + 0xFFFF * 0x5555u, &x, &y);
         orbit_place(&x, &y);
-        syn.ox = x, syn.oy = y;
+        syn.ox = clamp(x + orb_dx, -32767, 32767), syn.oy = clamp(y + orb_dy, -32767, 32767);
         sub_at(syn.sph, &syn.ox, &syn.oy, &syn.gx, &syn.gy);
     }
     for (v = 0; v < NVOICE; v++)

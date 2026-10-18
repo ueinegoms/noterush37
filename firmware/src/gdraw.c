@@ -289,6 +289,43 @@ static void card_board(void)
     lb_rows(98, ui.rank);
     button(194, 30, "JOGAR DE NOVO (PLAY)", C_YEL, C_BOX);
 }
+/* the VETOR (PARA): the square of the four corners, the path as it is now, the sound's place on it (the dot), and the
+ * mod wheel's lightning: its trail from the path out to the dot */
+#define VX0 59
+#define VY0 75
+#define VW 122
+static int32_t vx(int32_t q) { return VX0 + (((q + 32768) * (VW - 1)) >> 16); }
+static int32_t vy(int32_t q) { return VY0 + (((q + 32768) * (VW - 1)) >> 16); }
+static void card_vector(void)
+{
+    static const char *const NUM[NC] = {"1", "2", "3", "4"};
+    int32_t i, x, y, px = 0, py = 0, bx, by;
+    uint32_t c;
+    card_title(vec.on ? "VETOR LISSAJOUS - LIGADO" : "VETOR LISSAJOUS - DESLIGADO");
+    cv_rect(VX0, VY0, VW, VW, C_BOX);
+    for (i = 0; i <= 128; i++) {                   /* the path, 128 pieces round */
+        orbit_path((uint32_t)i << 25, 0, &x, &y);
+        orbit_place_spin(&x, &y, 0);
+        x = vx(x), y = vy(y);
+        if (i)
+            cv_line(px, py, x, y, vec.on ? C_STAFF : C_MUT);
+        px = x, py = y;
+    }
+    for (c = 0; c < NC; c++) {                     /* the corners: 1 2 above, 3 4 below */
+        int32_t cx = c & 1u ? VX0 + VW - 1 : VX0, cy = c & 2u ? VY0 + VW - 1 : VY0;
+        ellipse(cx, cy, 8, 8, C_YEL);
+        text_c(cx, cy - 8, &FONT_S, NUM[c], C_BOX);
+    }
+    bx = vx(syn.ox - orb_dx), by = vy(syn.oy - orb_dy);   /* the path's point; the bolt's trail out from it */
+    for (i = 0, px = bx, py = by; i < (int32_t)vb.tn; i++) {
+        x = vx(clamp(syn.ox - orb_dx + vb.tr[i][0], -32767, 32767)), y = vy(clamp(syn.oy - orb_dy + vb.tr[i][1], -32767, 32767));
+        cv_line(px, py, x, y, C_YEL);
+        px = x, py = y;
+    }
+    ellipse(vx(syn.gx), vy(syn.gy), 4, 4, vec.on ? C_YEL : C_MUT);
+    text_c(120, 208, &FONT_S, "K1-3 FORMA K4-7 CANTO K8 VEL", C_MUT);
+    text_c(120, 222, &FONT_S, vec.on ? "PLAY DESLIGA  PARA SAI" : "PLAY LIGA  PARA SAI", C_YEL);
+}
 static void card_setup(void)
 {
     uint32_t i;
@@ -339,7 +376,8 @@ static void title(void)                            /* the web's home: the rankin
         str_cpy(b, "< ", sizeof b);
         str_cat(b, MODE_NAME[ui.mode], sizeof b);
         str_cat(b, " >  GLOBE: CONFIG", sizeof b);
-        text_c(120, 216, &FONT_S, b, C_MUT);
+        text_c(120, 209, &FONT_S, b, C_MUT);
+        text_c(120, 224, &FONT_S, vec.on ? "PARA: VETOR (LIGADO)" : "PARA: VETOR", vec.on ? C_YEL : C_MUT);
     }
 }
 static void bolts(void)                            /* the lightning over everything (game.c: lightning): 1 px of */
@@ -367,8 +405,9 @@ static void sbolts(uint32_t strip)                 /* the band bolts of a strip 
         for (b = 0; b < sb[i].nb; b++)
             if (sb[i].at[b] < n && sb[i].at[b] >= i0) {
                 const int16_t *a = sb[i].p[sb[i].at[b]];
-                cv_line(a[0], a[1], sb[i].b[b][0][0], sb[i].b[b][0][1], C_YEL);
-                cv_line(sb[i].b[b][0][0], sb[i].b[b][0][1], sb[i].b[b][1][0], sb[i].b[b][1][1], C_YEL);
+                uint32_t j;
+                for (j = 0; j < sb[i].bl[b]; j++, a = sb[i].b[b][j - 1u])
+                    cv_line(a[0], a[1], sb[i].b[b][j][0], sb[i].b[b][j][1], C_YEL);
             }
     }
 }
@@ -388,6 +427,7 @@ static void scene(void)
         case GS_NAME: card_name(); break;
         case GS_BOARD: card_board(); break;
         case GS_SETUP: card_setup(); break;
+        case GS_VECTOR: card_vector(); break;
         }
     }
     if (bolt.t)

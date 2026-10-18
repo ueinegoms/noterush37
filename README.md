@@ -17,7 +17,10 @@ lightning round the combo while it runs. A wrong key or the time out: game over,
 The keys always play; they answer only when asked. SEQ PLAY does what the screen offers (JOGAR, ENVIAR, JOGAR DE
 NOVO, the note again); PATCH goes back. Title: < > the mode; GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the
 web; SOM; NOTAS INICIAIS; ACERTOS/FASE). The sound: K1..K8 BRILHO, RESSONÂNCIA, ATAQUE, RELEASE, DRIVE, SALA, ECO
-TEMPO, ECO REPETE; the faders VOLUME, REVERB, DELAY, CHORUS; the mod wheel vibrato, the pitch wheel a bend. The
+TEMPO, ECO REPETE; the faders VOLUME, REVERB, DELAY, CHORUS; the pitch wheel a bend; the mod wheel lightning on the
+orbit (the sound's place jumps about as a bolt). PARA: the VETOR, the same for every sound: a Lissajous round the four
+corners, running free; on, the knobs are its (K1..K3 the figure: FREQ X, FREQ Y, FASE; K4..K7 each corner's
+brightness; K8 the speed). Off, every note starts the same (the same key, the same sound). The
 simulator page installs it on the keyboard (CONECTAR, INSTALAR: Chrome / Edge).
 
 ```

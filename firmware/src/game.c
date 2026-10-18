@@ -14,7 +14,10 @@
  * screen offers (JOGAR, ENVIAR, JOGAR DE NOVO, the OUVIDO note again: a pad too); PATCH goes back. Title: < > the
  * mode; GLOBE: the settings (TEMPO, SOM, NOTAS INICIAIS, ACERTOS/FASE: < > the row, K1..K4 or OCT- OCT+ the value).
  * The name: OCT+ OCT- the letter, < > the place. The sound: K1..K8 its parameters, the faders VOLUME, REVERB, DELAY,
- * CHORUS, the mod wheel vibrato, the pitch wheel a bend. */
+ * CHORUS, the pitch wheel a bend, the mod wheel lightning on the orbit (the sound's place jumps about as a bolt).
+ * PARA: the VETOR, the same for every sound: a Lissajous path round the four corners, running free (a note sounds
+ * where the path is); while it is on the knobs are its: K1 K2 K3 the figure (FREQ X, FREQ Y, FASE), K4..K7 each
+ * corner's brightness, K8 its speed. PLAY there switches it on / off. */
 #if !BOARD_SMK37
 #error "NOTE RUSH 37 is for the SMK-37 (Pro / Elite / MKE-P37)"
 #endif
@@ -31,7 +34,7 @@ enum { B_KNOBBANK, B_FADERBANK, B_LEFT, B_RIGHT, B_OCTDN, B_OCTUP, B_ARP, B_REPE
 #define NR_KEY0 48                                 /* the bottom key: C3 */
 #define NR_LB 5u                                   /* the ranking's places */
 
-enum { GS_TITLE, GS_INTRO, GS_ASK, GS_OK, GS_OVER, GS_NAME, GS_BOARD, GS_SETUP };
+enum { GS_TITLE, GS_INTRO, GS_ASK, GS_OK, GS_OVER, GS_NAME, GS_BOARD, GS_SETUP, GS_VECTOR };
 enum { PH_NOME, PH_PAUTA, PH_OUVIDO, PH_N };
 enum { MODE_ALL, MODE_NOME, MODE_PAUTA, MODE_OUVIDO, MODE_N };
 enum { WHY_KEY = 1, WHY_TIME };
@@ -63,6 +66,18 @@ static const sctl_t KNOB[8] = {{"BRILHO", 1, CP_CUT}, {"RESSON\xC2NCIA", 1, CP_R
                                {"ECO TEMPO", 0, G_DLTIME}, {"ECO REPETE", 0, G_DLFB}};
 static const sctl_t FADER[4] = {{"VOLUME", 0, G_VOLUME}, {"REVERB", 0, G_RVMIX}, {"DELAY", 0, G_DLMIX},
                                 {"CHORUS", 0, G_CHMIX}};
+
+/* the VETOR (PARA): a store object of its own; the corners' brightness: added to the sound's own */
+#define VEC_OBJ (OBJ_SCENE0 + 2u)
+#define VEC_MAGIC 0x4E525631u                      /* "NRV1" */
+typedef struct { uint32_t magic; uint8_t on, speed; int8_t fx, fy, ph, cut[NC]; uint8_t rsv; } vec_t;
+static vec_t vec = {VEC_MAGIC, 0, 48, -64, -39, 0, {0, 0, 0, 0}, 0}, vec_was;   /* (a figure eight) */
+static const char *const VEC_NAME[8] = {"FREQ X", "FREQ Y", "FASE", "CANTO 1", "CANTO 2", "CANTO 3", "CANTO 4",
+                                        "VELOCIDADE"};
+#define VEC_SPEED_MAX 112
+static int16_t base_cut[NC];                       /* the sound's own corner cutoffs */
+static const int8_t DIR16[16][2] = {{64, 0}, {59, 24}, {45, 45}, {24, 59}, {0, 64}, {-24, 59}, {-45, 45}, {-59, 24},
+                                    {-64, 0}, {-59, -24}, {-45, -45}, {-24, -59}, {0, -64}, {24, -59}, {45, -45}, {59, -24}};
 
 /* the ranking: a store object of its own (storage.c; scenes.c's sounds: OBJ_SCENE0) */
 #define LB_OBJ (OBJ_SCENE0 + 1u)
@@ -97,7 +112,7 @@ static struct {
     uint8_t tone_note, due_note;
     uint64_t keys;
     uint32_t flash_t;                              /* game over's red, from */
-    int32_t bend, vib;                             /* the pitch wheel (Q15), the mod wheel (vibrato depth, Q15) */
+    int32_t bend, mod;                             /* the pitch wheel (Q15), the mod wheel (0 .. 32767) */
     uint8_t fad[4], fad_ready;                     /* the faders as last taken */
     uint32_t rnd;
     uint8_t dirty;                                 /* everything to draw again (main.c, console.c set it) */
@@ -159,6 +174,22 @@ static void tone_later(uint32_t n, uint32_t ms)
     ui.due_note = (uint8_t)n;
     ui.tone_due = (fm1_ms + ms) | 1u;
 }
+/* the VETOR on the sound: a Lissajous (FAMILY 0) as large as fits, unturned, no moon (the sound is where the path
+ * is), running free (no restart); its speed: 8 beats a round at the sound's tempo, x 0.2 .. x 25 */
+static void vec_apply(void)
+{
+    uint32_t c, v = vec.speed > VEC_SPEED_MAX ? VEC_SPEED_MAX : vec.speed;
+    if (!vec.on) {
+        orb_q8 = 256;
+        return;
+    }
+    pt.g[G_SHAPE] = 0, pt.g[G_WARPY] = vec.fx, pt.g[G_MORPH] = vec.fy, pt.g[G_WARPX] = vec.ph;
+    pt.g[G_SIZE] = 127, pt.g[G_ROT] = 0, pt.g[G_CX] = pt.g[G_CY] = 0, pt.g[G_SPIN] = 0;
+    pt.g[G_SUBSZ] = 0, pt.g[G_RETRIG] = 0, pt.g[G_RATE] = 2;
+    for (c = 0; c < NC; c++)
+        pt.c[c][CP_CUT] = (int16_t)clamp(base_cut[c] + vec.cut[c], 0, 127);
+    orb_q8 = (51u << (v >> 4)) * (256u + (v & 15u) * 16u) >> 8;
+}
 static void preset_load(uint32_t n)                /* the sound: factory sound n (also the USB console's "preset") */
 {
     ev_push(EV_ALLOFF, 0, 0);
@@ -169,11 +200,16 @@ static void preset_load(uint32_t n)                /* the sound: factory sound n
     pt.g[G_SPIN] = 0;                              /* (and the path does not turn on with the time) */
     if (pt.g[G_POLY] == PM_POLY)                   /* (Vector37's), no random place in the stereo, no random drift */
         pt.g[G_STEREO] = 0, pt.g[G_DETUNE] = 0;
+    {
+        uint32_t c;
+        for (c = 0; c < NC; c++)
+            base_cut[c] = pt.c[c][CP_CUT];
+    }
+    vec_apply();
 }
-static void sctl_say(const sctl_t *c)
+static void say_num(const char *name, int32_t v)   /* "BRILHO 80" in the header */
 {
     char b[8];
-    int32_t v = c->corner ? pt.c[0][c->id] : pt.g[c->id];
     uint32_t n = 0;
     if (v < 0)
         b[n++] = '-', v = -v;
@@ -183,9 +219,10 @@ static void sctl_say(const sctl_t *c)
         b[n++] = (char)('0' + v / 10 % 10);
     b[n++] = (char)('0' + v % 10);
     b[n] = 0;
-    ui_say(c->name, " ");
+    ui_say(name, " ");
     str_cat(ui.msg, b, sizeof ui.msg);
 }
+static void sctl_say(const sctl_t *c) { say_num(c->name, c->corner ? pt.c[0][c->id] : pt.g[c->id]); }
 static void sctl_set(const sctl_t *c, int32_t v, int rel)   /* rel: v is a change */
 {
     uint32_t k;
@@ -252,6 +289,62 @@ static void lb_add(void)
     ui.rank = (uint8_t)i;
     if (flash_ok && store_on)
         st_save(LB_OBJ, &lb, sizeof lb);
+}
+
+static void vec_load(void)
+{
+    if (!(flash_ok && store_on && st_load(VEC_OBJ, &vec, sizeof vec) == (int)sizeof vec && vec.magic == VEC_MAGIC)) {
+        vec_t d = {VEC_MAGIC, 0, 48, -64, -39, 0, {0, 0, 0, 0}, 0};
+        vec = d;
+    }
+    vec.on &= 1u;
+}
+static void vec_knob(uint32_t k, int32_t s)        /* the VETOR's knobs: the figure, the corners, the speed */
+{
+    int8_t *p = k == 0u ? &vec.fx : k == 1u ? &vec.fy : k == 2u ? &vec.ph : k < 7u ? &vec.cut[k - 3u] : 0;
+    if (p) {
+        *p = (int8_t)clamp(*p + s * 2, -64, 63);
+        if (k < 2u) {                              /* (a frequency: as the path takes it, 1.0 .. 6.0) */
+            int32_t f = clamp(256 + (*p + 64) * 256 / 25, 256, 6 * 256);
+            char b[8] = {(char)('0' + (f >> 8)), '.', (char)('0' + ((f & 255) * 10 >> 8)), 0};
+            ui_say(VEC_NAME[k], " "), str_cat(ui.msg, b, sizeof ui.msg);
+        } else
+            say_num(VEC_NAME[k], *p);
+    } else {
+        vec.speed = (uint8_t)clamp((int32_t)vec.speed + s * 2, 0, VEC_SPEED_MAX);
+        say_num(VEC_NAME[7], vec.speed);
+    }
+    vec_apply();
+}
+
+/* the mod wheel's lightning on the orbit: the sound's place jumps out from the path as a bolt does, piece by piece,
+ * each bent off the straight way, then back to the path and out again, somewhere else; farther and quicker the
+ * further the wheel is up (gdraw.c draws its trail on the VETOR) */
+#define VB_TRAIL 12u
+static struct { int32_t x, y, tx, ty; uint32_t t; uint8_t n, tn; int16_t tr[VB_TRAIL][2]; } vb;
+static void vbolt_tick(void)
+{
+    int32_t a = ui.mod;
+    if (since(vb.t) < 32u - (uint32_t)a * 22u / 32767u)
+        return;
+    vb.t = fm1_ms | 1u;
+    if (a < 400) {                                 /* (the wheel down: back onto the path) */
+        vb.x = vb.x * 3 / 4, vb.y = vb.y * 3 / 4, vb.n = 0, vb.tn = 0;
+    } else {
+        int32_t ex, ey, j;
+        if (!vb.n) {                               /* a new bolt: from the path, out toward somewhere */
+            const int8_t *d = DIR16[rnd() % 16u];
+            int32_t r = a / 100 * (40 + (int32_t)(rnd() % 60u)) * 3 / 4;
+            vb.tx = d[0] * r / 64, vb.ty = d[1] * r / 64;
+            vb.x = vb.y = 0, vb.n = (uint8_t)(3u + rnd() % 5u), vb.tn = 0;
+        }
+        ex = (vb.tx - vb.x) / vb.n, ey = (vb.ty - vb.y) / vb.n, j = (int32_t)(rnd() % 201u) - 100;
+        vb.x = clamp(vb.x + ex - ey * j / 150, -32767, 32767), vb.y = clamp(vb.y + ey + ex * j / 150, -32767, 32767);
+        vb.n--;
+        if (vb.tn < VB_TRAIL)
+            vb.tr[vb.tn][0] = (int16_t)vb.x, vb.tr[vb.tn++][1] = (int16_t)vb.y;
+    }
+    orb_dx = vb.x, orb_dy = vb.y;
 }
 
 /* ------------------------------------------------------------- the lightning --- */
@@ -325,11 +418,12 @@ static void pad_bolt(int left, uint32_t row, int up, uint32_t delay)   /* from t
  * there; out at the right edge it goes on across the pads */
 #define SB_N 3u
 #define SB_PTS 24u
+#define SB_BR 10u                                  /* branches at most */
 #define SB_RUN 130u                                /* its run across the band */
 #define SB_LIFE 300u                               /* ... then it draws back into the right edge */
-static struct { uint32_t t; uint8_t n, nb, strip; uint8_t at[4]; int16_t p[SB_PTS][2], b[4][2][2]; } sb[SB_N];
-static void band_bolt(int32_t y0, int32_t y1, uint32_t strip)
-{
+static struct { uint32_t t; uint8_t n, nb, strip; uint8_t at[SB_BR], bl[SB_BR]; int16_t p[SB_PTS][2], b[SB_BR][3][2]; } sb[SB_N];
+static void band_bolt(int32_t y0, int32_t y1, uint32_t strip, int wild)   /* wild: more branches, longer, and */
+{                                                                          /* only on the screen (not on the pads) */
     uint32_t s, o = 0, n = 0;
     int32_t x = 0, y = y0 + (int32_t)(rnd() % (uint32_t)(y1 - y0 + 1));
     for (s = 1; s < SB_N; s++)
@@ -342,18 +436,22 @@ static void band_bolt(int32_t y0, int32_t y1, uint32_t strip)
         x = x > 239 ? 239 : x;
         y = clamp(y + (int32_t)(rnd() % 21u) - 10, y0, y1);
         sb[o].p[n][0] = (int16_t)x, sb[o].p[n++][1] = (int16_t)y;
-        if (sb[o].nb < 4u && rnd() % 100u < 25u) { /* a branch: two pieces off, up or down */
-            int32_t d = rnd() & 1u ? 1 : -1, k;
-            for (k = 0; k < 2; k++)
-                sb[o].b[sb[o].nb][k][0] = (int16_t)(x + 4 + k * 5 + (int32_t)(rnd() % 4u)),
-                sb[o].b[sb[o].nb][k][1] = (int16_t)clamp(y + d * (5 + k * 6 + (int32_t)(rnd() % 4u)), y0, y1);
+        if (sb[o].nb < (wild ? SB_BR : 4u) && rnd() % 100u < (wild ? 60u : 25u)) {   /* a branch, up or down */
+            int32_t d = rnd() & 1u ? 1 : -1, k, bl = wild ? 3 : 2, bx = x, by = y;
+            for (k = 0; k < bl; k++) {             /* (each piece further off, and bent) */
+                bx += (wild ? 3 : 4) + (int32_t)(rnd() % (wild ? 9u : 5u)) - (wild ? 2 : 0);
+                by = clamp(by + d * (4 + (int32_t)(rnd() % (wild ? 10u : 6u))), y0, y1);
+                sb[o].b[sb[o].nb][k][0] = (int16_t)bx, sb[o].b[sb[o].nb][k][1] = (int16_t)by;
+            }
+            sb[o].bl[sb[o].nb] = (uint8_t)bl;
             sb[o].at[sb[o].nb++] = (uint8_t)(n - 1u);
         }
     }
     sb[o].n = (uint8_t)n;
     sb[o].strip = (uint8_t)strip;
     sb[o].t = fm1_ms | 1u;
-    pad_bolt(1, (uint32_t)(y - y0) * 2u > (uint32_t)(y1 - y0) ? 1u : 0u, 0, SB_RUN);   /* (on, from its height) */
+    if (!wild)
+        pad_bolt(1, (uint32_t)(y - y0) * 2u > (uint32_t)(y1 - y0) ? 1u : 0u, 0, SB_RUN);   /* (on, from its height) */
 }
 
 /* ------------------------------------------------------------- the game --- */
@@ -479,9 +577,9 @@ static void game_tick(void)
         if (ui.gs == GS_NAME || (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK)) {
             if ((int32_t)(now - due) >= 0) {
                 if (ui.gs == GS_NAME)
-                    band_bolt(48, 102, D_MID), due = now + 260u + rnd() % 300u;
+                    band_bolt(46, 104, D_MID, 1), due = now + 140u + rnd() % 220u;
                 else
-                    band_bolt(3, 30, D_HEAD), due = now + 1500u - (ui.combo > 60u ? 60u : ui.combo) * 20u + rnd() % 200u;
+                    band_bolt(3, 30, D_HEAD, 0), due = now + 1500u - (ui.combo > 60u ? 60u : ui.combo) * 20u + rnd() % 200u;
             }
         } else
             due = now + 300u;
@@ -492,6 +590,12 @@ static void game_tick(void)
                     sb[i].t = 0;
             }
     }
+    if (ui.gs == GS_VECTOR) {                      /* (the VETOR: its dot moves) */
+        static uint32_t vt;
+        if (now / 33u != vt)
+            vt = now / 33u, ui.redraw |= D_BODY;
+    }
+    vbolt_tick();
     if (bolt.t && since(bolt.t) >= NR_OK_MS) {
         bolt.t = 0;
         ui.dirty = 1;                              /* (the last frame: without it) */
@@ -578,6 +682,31 @@ static void setup_turn(uint32_t row, int32_t d)
     }
     ui.redraw |= D_BODY;
 }
+static void vec_open(void)
+{
+    vec_was = vec;
+    if (!vec.on) {
+        vec.on = 1;
+        vec_apply();
+    }
+    enter(GS_VECTOR);
+}
+static void vec_toggle(void)
+{
+    vec.on ^= 1u;
+    if (vec.on)
+        vec_apply();
+    else
+        preset_load(SND[ui.set[SET_SOUND]]);       /* (the sound as it comes) */
+    ui_say(vec.on ? "VETOR LIGADO" : "VETOR DESLIGADO", 0);
+    ui.redraw |= D_BODY;
+}
+static void vec_close(void)
+{
+    if (memcmp(&vec, &vec_was, sizeof vec) && flash_ok && store_on)
+        st_save(VEC_OBJ, &vec, sizeof vec);
+    to_title();
+}
 static void replay(void)
 {
     if (ui.gs == GS_ASK && ui.phase == PH_OUVIDO)
@@ -627,6 +756,12 @@ static void buttons_poll(void)
             else if (b == B_OCTDN || b == B_OCTUP)
                 setup_turn(ui.sel, b == B_OCTDN ? -1 : 1);
             break;
+        case GS_VECTOR:
+            if (b == B_PARA || b == B_PATCH)
+                vec_close();
+            else if (b == B_PLAY)
+                vec_toggle();
+            break;
         case GS_NAME:
             if (b == B_OCTUP || b == B_OCTDN)
                 name_letter(b == B_OCTUP ? 1 : -1);
@@ -642,6 +777,8 @@ static void buttons_poll(void)
                 to_title();
             else if (b == B_GLOBE && (ui.gs == GS_TITLE || ui.gs == GS_BOARD))
                 setup_open();
+            else if (b == B_PARA && (ui.gs == GS_TITLE || ui.gs == GS_BOARD))
+                vec_open();
             else if (ui.gs == GS_TITLE && (b == B_LEFT || b == B_RIGHT))
                 mode_step(b == B_LEFT ? -1 : 1);
             else if (b == B_PLAY) {
@@ -663,6 +800,8 @@ static void knobs_poll(void)                       /* the settings: K1..K4 its r
             continue;
         if (ui.gs == GS_SETUP && k < SET_N)
             setup_turn(k, s);
+        else if (vec.on)
+            vec_knob(k, s);                        /* (the VETOR on: the knobs are its) */
         else
             sctl_set(&KNOB[k], s * 2, 1);
     }
@@ -683,14 +822,13 @@ static void faders_poll(void)                      /* VOLUME, REVERB, DELAY, CHO
     }
     ui.fad_ready = 1;
 }
-/* the wheels (as Vector37's ui.c reads them): pitch a bend (its centre where it rests); mod the vibrato's depth (up to
- * 40 cents at 5.5 Hz, a triangle), both through the engine's bend */
+/* the wheels (as Vector37's ui.c reads them): pitch a bend (its centre where it rests); mod the lightning on the orbit
+ * (vbolt_tick) */
 static void wheels_poll(void)
 {
     enum { DEAD = 12, SPAN0 = 80, MOD_LO = 485, MOD_HI = 615 };
     static int32_t pc, plo, phi, mlo, mhi, rest, mf, shown = -1;
     int32_t p = fm1_in.wheel[0], m = fm1_in.wheel[1], d, x;
-    uint32_t ph;
     if (fm1_in.frames < 300u)
         return;
     if (!pc) {
@@ -714,19 +852,17 @@ static void wheels_poll(void)
     ui.bend = clamp(x, -32767, 32767);
     x = mhi - m <= DEAD ? 0 : clamp((mhi - m - DEAD) * 32767 / (mhi - mlo - DEAD > 1 ? mhi - mlo - DEAD : 1), 0, 32767);
     mf += (x * 8 - mf) >> 3;                       /* (smoothed: the reading is noisy) */
-    ui.vib = (mf + 4) >> 3;
-    x = ui.vib * 100 / 32767;
+    ui.mod = (mf + 4) >> 3;
+    x = ui.mod * 100 / 32767;
     if (x != shown && (x - shown > 2 || shown - x > 2 || x == 0)) {
         if (shown >= 0) {
             char b[6];
             b[0] = (char)('0' + x / 100), b[1] = (char)('0' + x / 10 % 10), b[2] = (char)('0' + x % 10), b[3] = '%', b[4] = 0;
-            ui_say("VIBRATO ", x >= 100 ? b : x >= 10 ? b + 1 : b + 2);
+            ui_say("RAIO ", x >= 100 ? b : x >= 10 ? b + 1 : b + 2);
         }
         shown = x;
     }
-    ph = (fm1_ms * 5632u / 1000u) & 1023u;         /* 5.5 Hz */
-    x = ph < 512u ? (int32_t)ph * 128 - 32768 : (int32_t)(1023u - ph) * 128 - 32768;
-    joy_x = clamp(ui.bend + ((ui.vib * 2 / (5 * pt.g[G_BEND])) * x >> 15), -32767, 32767);
+    joy_x = ui.bend;
 }
 
 /* USB MIDI in: a MIDI keyboard plays and answers as the keys do (any channel, or the one set) */
@@ -753,11 +889,11 @@ static void midi_poll(void)
 }
 
 /* ------------------------------------------------------------- LEDs --- */
-/* the identity's colours: yellow on blue. Under it all: in play the combo meter (column by column from the bottom
- * left, each 16 a lap: yellow on blue, then white on yellow), game over red, the menus a slow blue breath; over it the
- * pads' lightning (pad_bolt): a right answer, the start, and in the menus now and then on its own */
+/* the identity's colours, blue and yellow: a slow blue breath under it all (game over: red), over it the pads'
+ * lightning (pad_bolt) in yellow: the screen's bolts going on (a right answer, a combo running), the start, and in the
+ * menus now and then on its own */
 static const uint8_t C_YEL_LED[3] = {255, 230, 40}, C_BLU_LED[3] = {20, 50, 255};
-static const uint8_t C_ERR_LED[3] = {255, 20, 50}, C_WHT_LED[3] = {255, 255, 255};
+static const uint8_t C_ERR_LED[3] = {255, 20, 50};
 static void pad_col(uint32_t pad, const uint8_t *c, uint32_t k)   /* k of 256 */
 {
     uint32_t sc = (4u + settings.bright * 12u) * k >> 8;
@@ -768,7 +904,7 @@ static void ui_leds(void)
     static uint32_t idle_next;
     uint32_t i, now = fm1_ms, fl = ui.flash_t ? since(ui.flash_t) : 1000000u;
     int menu = ui.gs == GS_TITLE || ui.gs >= GS_NAME;
-    if (menu && ui.gs != GS_NAME && (int32_t)(now - idle_next) >= 0) {   /* (the name: the screen feeds them) */ /* (the menus: a bolt now and then, either way, either row) */
+    if (menu && (int32_t)(now - idle_next) >= 0) {   /* (the menus: a bolt now and then, either way, either row) */ /* (the menus: a bolt now and then, either way, either row) */
         pad_bolt((int)(rnd() & 1u), rnd() & 1u, 0, 0);
         idle_next = now + 500u + rnd() % 1100u;
     }
@@ -783,21 +919,15 @@ static void ui_leds(void)
     for (i = 0; i < 16u; i++) {
         uint32_t pad = (i & 1u ? 0u : 8u) + i / 2u;   /* (i: the meter's order) */
         uint32_t age = pheat[pad] ? since(pheat[pad]) : PH_MS;
-        if (age < 70u)                             /* struck: white, flickering */
-            pad_col(pad, (rnd() & 3u) ? C_WHT_LED : C_YEL_LED, 256u);
+        if (age < 70u)                             /* struck: yellow, flickering */
+            pad_col(pad, C_YEL_LED, (rnd() & 1u) ? 256u : 150u);
         else if (age < PH_MS)                      /* its glow */
             pad_col(pad, C_YEL_LED, 256u - (age - 70u) * 216u / (PH_MS - 70u));
         else if (ui.gs == GS_OVER)
             pad_col(pad, C_ERR_LED, fl < 500u ? 256u : (now / 300u) & 1u ? 110u : 40u);
-        else if (menu) {
+        else {
             uint32_t ph = (now / 8u) & 255u;
             pad_col(pad, C_BLU_LED, ph < 128u ? 30u + ph / 2u : 30u + (255u - ph) / 2u);
-        } else {
-            uint32_t lit = ui.combo % 16u, lap = (ui.combo / 16u) & 1u;
-            if (i < lit)
-                pad_col(pad, lap ? C_WHT_LED : C_YEL_LED, 256u);
-            else
-                pad_col(pad, lap ? C_YEL_LED : C_BLU_LED, 40u);
         }
     }
     fm1_led_key(B_LEFT, ui.gs == GS_TITLE || ui.gs == GS_SETUP || ui.gs == GS_NAME);
@@ -806,6 +936,7 @@ static void ui_leds(void)
                         || (ui.gs == GS_ASK && ui.phase == PH_OUVIDO));
     fm1_led_key(B_GLOBE, ui.gs == GS_SETUP || ((ui.gs == GS_TITLE || ui.gs == GS_BOARD) && !((now / 500u) & 1u)));
     fm1_led_key(B_PATCH, ui.gs != GS_TITLE);
+    fm1_led_key(B_PARA, vec.on);
     fm1_led_key(B_OCTDN, ui.gs == GS_SETUP || ui.gs == GS_NAME);
     fm1_led_key(B_OCTUP, ui.gs == GS_SETUP || ui.gs == GS_NAME);
 }
@@ -814,6 +945,7 @@ static void ui_init(void)
 {
     set_load();
     lb_load();
+    vec_load();
     preset_load(SND[ui.set[SET_SOUND]]);
     enter(GS_TITLE);
 }

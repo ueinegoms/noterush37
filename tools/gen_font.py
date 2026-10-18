@@ -24,7 +24,8 @@ FONTS = Path(__file__).resolve().parents[1] / "assets" / "fonts"
 SIZES = [("S", "ter-u16n.bdf", 16, 1, True, 32, 255),   # Latin-1 (Hügelton needs the umlaut)
          ("L", "ter-u16n.bdf", 16, 2, True, 32, 255),   # NOTE RUSH: Latin-1 at every size (DÓ, RÉ, FÁ, LÁ, OUÇA)
          ("XL", "ter-u16n.bdf", 16, 3, True, 32, 255),  # big values (the same bitmaps at 3x)
-         ("XXL", "ter-u16n.bdf", 16, 4, True, 32, 255)] # the note's name (4x)
+         ("XXL", "ter-u16n.bdf", 16, 4, True, 32, 255), # the logo (4x)
+         ("H", "ter-u16n.bdf", 16, 8, True, 32, 95)]    # NOME: the note's letter alone (8x)
 PAD = 2
 
 

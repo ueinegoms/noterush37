@@ -68,6 +68,7 @@ class Vector37 extends AudioWorkletProcessor {
     }
     msg.pads = Array.from(new Uint32Array(mem, ex.sim_pads(), 16));
     msg.leds = ex.sim_leds();
+    msg.game = ex.sim_game();                                 // (tests: the state, the phase)
     this.port.postMessage(msg, tr);
   }
   process(inputs, outputs) {

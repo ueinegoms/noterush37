@@ -4,20 +4,25 @@
 as firmware, a fork of Vector37 by genkigenki: its board layer, synth engine (the notes sound as E.PIANO) and
 simulator; the game in `firmware/src/game.c` and `gdraw.c` in place of Vector37's `ui.c` and `draw.c`.
 
-- **NOME**: the name on the screen (DÓ .. SI): play it, any octave (+3)
-- **PAUTA**: the note on the treble staff (DÓ4 .. DÓ6): play that very key (+4)
+In the web version's look (violet, the electric blue card, yellow). FASE 1 MEMORIZE shows each new note; then:
+
+- **NOME**: the letter alone (C .. B): play it, any octave (+3)
+- **PAUTA**: the staff alone (C4 .. C6): play that very key (+4)
 - **OUVIDO**: the note heard: play it, any octave (+5)
 
-Three right in a row: the next phase; after OUVIDO a new note (centre-out from SI4, 3 at the start). A wrong key or
-6 s: game over. Title: < > or K1 the mode (TODAS, NOME, PAUTA, OUVIDO), a key or SEQ PLAY starts; PATCH: the title.
-The pads are the combo meter; the record is kept in flash.
+A right answer: lightning from the key to the combo (as many bolts as the points, brighter the quicker). N right in
+a row: the next phase; after OUVIDO a new note (centre-out from B4). A wrong key or the time out: game over, a name
+(AAA: OCT+ OCT- the letter, < > the place, PLAY saves) for the local top 5. Title: < > or K1 the mode, a key (silent)
+or SEQ PLAY starts; GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the web; SOM; NOTAS INICIAIS;
+ACERTOS/FASE); PATCH: the title. The pads: the combo meter, the start's sweep, the lightning, game over. The ranking
+and the settings are kept in flash.
 
 ```
 MODEL=elite sh build.sh            # build/noterush37-elite.fwsc (JieLi toolchain + AC79 SDK V1.2.1, see below)
 python tools/fm1_install.py --yes build/noterush37-elite.fwsc
 sh web/sim/build.sh                # the simulator (Emscripten, or clang + wasm-ld): build/sim
 python3 -m http.server -d build/sim 8737
-cc -O1 -Ibuild/gen -o build/nr_shot tests/nr_shot.c && build/nr_shot   # the game's rules + screenshots
+mkdir -p build/nrshots && cc -O1 -Ibuild/gen -o build/nr_shot tests/nr_shot.c && build/nr_shot   # rules + screens
 ```
 
 Unofficial firmware, untested on a unit yet. Rescue: hold OCT- while switching on. Vector37's own README follows.

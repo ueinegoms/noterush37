@@ -1,10 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* NOTE RUSH 37 on the host: plays a game through the simulated panel (tests/panel.h) and writes the screen as PPM
- * files (build/shots/NN-name.ppm): the title, each phase, a right answer, game over. Also checks the game's rules.
+/* NOTE RUSH 37 on the host: plays games through the simulated panel (tests/panel.h), checks the rules and writes
+ * the screen as PPM files (build/nrshots/NN-name.ppm).
  *   cc -O1 -Ibuild/gen -o build/nr_shot tests/nr_shot.c && build/nr_shot */
 #include "panel.h"
 #include <stdio.h>
-#include <stdlib.h>
 
 static int fails;
 #define CHECK(c, ...) do { if (!(c)) { printf("FAIL %s:%d: ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); fails++; } } while (0)
@@ -15,7 +14,7 @@ static void shot(const char *name)
     char p[256];
     FILE *f;
     int i;
-    snprintf(p, sizeof p, "build/shots/%02d-%s.ppm", n++, name);
+    snprintf(p, sizeof p, "build/nrshots/%02d-%s.ppm", n++, name);
     f = fopen(p, "wb");
     fprintf(f, "P6 240 240 255\n");
     for (i = 0; i < 240 * 240; i++) {
@@ -26,10 +25,14 @@ static void shot(const char *name)
     }
     fclose(f);
 }
-static uint32_t sim_voices_n(void) { uint32_t v, n = 0; for (v = 0; v < NVOICE; v++) n += vs[v].stage != 0; return n; }
-static void key(int k) { panel_key((uint32_t)k, 1, 100); panel_ms(40); panel_key((uint32_t)k, 0, 0); panel_ms(40); }
+static uint32_t voices(void) { uint32_t v, n = 0; for (v = 0; v < NVOICE; v++) n += vs[v].stage != 0; return n; }
+static void press(int k) { panel_key((uint32_t)k, 1, 100); panel_ms(20); }
+static void lift(int k) { panel_key((uint32_t)k, 0, 0); panel_ms(20); }
+static void key(int k) { press(k); lift(k); }
+static void btn(int b) { panel_button((uint32_t)b, 1); panel_ms(20); panel_button((uint32_t)b, 0); panel_ms(20); }
 static int target_key(void) { return (int)note_midi(ui.cur) - NR_KEY0; }
-static void wait_ask(void) { int i; for (i = 0; i < 400 && ui.gs != GS_ASK; i++) panel_ms(20); }
+static void wait_gs(int gs) { int i; for (i = 0; i < 600 && ui.gs != gs; i++) panel_ms(20); }
+static void answer(void) { wait_gs(GS_ASK); key(target_key()); }
 
 int main(void)
 {
@@ -38,83 +41,106 @@ int main(void)
     panel_ms(300);
     shot("title");
     CHECK(ui.gs == GS_TITLE, "starts on the title");
-    panel_button(B_RIGHT, 1); panel_ms(30); panel_button(B_RIGHT, 0); panel_ms(30);
+    btn(B_RIGHT);
     CHECK(ui.mode == MODE_NOME, "> picks the next mode (%d)", ui.mode);
-    panel_button(B_LEFT, 1); panel_ms(30); panel_button(B_LEFT, 0); panel_ms(30);
+    btn(B_LEFT);
     CHECK(ui.mode == MODE_ALL, "< back");
-    key(12);                                       /* any key: start */
-    CHECK(ui.gs == GS_INTRO && ui.unlocked == NR_START, "a key starts: the intro (%d)", ui.gs);
-    panel_ms(200);
-    shot("intro");
-    for (i = 0; i < 400 && ui.gs != GS_PHASE; i++) panel_ms(20);
-    CHECK(ui.gs == GS_PHASE && ui.phase == PH_NOME, "the first phase's banner");
+
+    /* the settings */
+    btn(B_GLOBE);
+    CHECK(ui.gs == GS_SETUP, "GLOBE: the settings");
+    CHECK(ui.set[SET_TIME] == 1 && ui.set[SET_START] == 3 && ui.set[SET_SFP] == 3, "the web's defaults");
+    btn(B_OCTDN);
+    CHECK(ui.set[SET_TIME] == 0 && time_limit() == 0, "TEMPO down to SEM LIMITE");
     panel_ms(100);
-    shot("phase-nome");
-    wait_ask();
+    shot("setup");
+    btn(B_GLOBE);
+    CHECK(ui.gs == GS_TITLE && settings.rsv[0] == NR_SET_TAG && settings.rsv[1] == 0, "GLOBE again: saved");
+
+    /* a game without a time limit */
+    for (i = 0; i < 60; i++) panel_ms(20);
+    press(12);
+    CHECK(ui.gs == GS_INTRO, "a key starts");
+    panel_ms(100);
+    CHECK(voices() == 0, "the key that starts is silent (%u)", voices());
+    lift(12);
+    panel_ms(100);
+    shot("start");
+    wait_gs(GS_ASK);
+    CHECK(ui.phase == PH_NOME && ui.limit == 0, "NOME, no limit");
     panel_ms(100);
     shot("ask-nome");
-    /* NOME: any octave */
+    panel_ms(10000);
+    CHECK(ui.gs == GS_ASK, "SEM LIMITE: no game over after 10 s");
     key(target_key() + 12 <= 36 ? target_key() + 12 : target_key() - 12);
-    CHECK(ui.gs == GS_OK && ui.combo == 3, "NOME: the right name an octave off counts (%d, %d)", ui.gs, ui.combo);
-    panel_ms(60);
-    shot("ok-nome");
-    wait_ask(); key(target_key());
-    wait_ask(); key(target_key());
-    for (i = 0; i < 100 && ui.gs != GS_PHASE; i++) panel_ms(20);
+    CHECK(ui.gs == GS_OK && ui.combo == 3, "NOME: any octave (%d, %d)", ui.gs, ui.combo);
+    CHECK(bolt.t == 0, "10 s to answer: no lightning");
+    answer(); answer();
+    wait_gs(GS_ASK);
     CHECK(ui.phase == PH_PAUTA && ui.combo == 9, "three right: PAUTA (%d, %d)", ui.phase, ui.combo);
-    wait_ask();
-    panel_ms(1500);
+    panel_ms(100);
     shot("ask-pauta");
     key(target_key());
-    CHECK(ui.combo == 13, "PAUTA +4 (%d)", ui.combo);
-    wait_ask(); key(target_key());
-    wait_ask(); key(target_key());
-    wait_ask();
+    CHECK(ui.combo == 13 && bolt.t && bolt.n == 4, "PAUTA +4, quick: four bolts (%d %d %u)", bolt.n, ui.combo, bolt.t);
+    panel_ms(100);
+    shot("lightning");
+    answer(); answer();
+    wait_gs(GS_ASK);
     CHECK(ui.phase == PH_OUVIDO, "then OUVIDO (%d)", ui.phase);
     panel_ms(200);
     shot("ask-ouvido");
-    CHECK(sim_voices_n() > 0, "OUVIDO: the note sounds");
-    key(target_key()); panel_ms(40);
-    shot("ok-ouvido");
-    wait_ask(); key(target_key());
-    wait_ask(); key(target_key());
-    for (i = 0; i < 100 && ui.gs != GS_INTRO; i++) panel_ms(20);
-    CHECK(ui.gs == GS_INTRO && ui.unlocked == NR_START + 1u, "all three phases: a new note (%d)", ui.unlocked);
+    CHECK(voices() > 0, "OUVIDO: the note sounds");
+    answer(); answer(); answer();
+    wait_gs(GS_INTRO);
+    CHECK(ui.unlocked == 4u, "all phases: a new note (%d)", ui.unlocked);
     panel_ms(100);
-    shot("new-note");
-    wait_ask();
+    shot("intro");
+    wait_gs(GS_ASK);
     CHECK(ui.phase == PH_NOME, "back to NOME");
-    /* PAUTA needs the very key: play every note of the staff in turn on screen */
-    {
-        int t = target_key(), wrong = (t % 12 == 1) ? t + 1 : t + 1;   /* (a semitone off: wrong) */
-        key(wrong);
-        CHECK(ui.gs == GS_OVER && ui.why == WHY_KEY, "a wrong key: game over");
-        panel_ms(700);
-        shot("over-key");
-        CHECK(ui.best == 36 && ui.newbest, "the record (%d)", ui.best);
-        CHECK(settings.rsv[0] == 36, "kept in the settings");
-    }
-    key(12);
-    CHECK(ui.gs == GS_OVER, "a key too soon after game over: nothing");
-    panel_ms(1000);
-    key(12);
-    CHECK(ui.gs == GS_INTRO && ui.combo == 0, "a key after: again");
-    wait_ask();
-    panel_ms(NR_LIMIT_MS + 200);
+    key(target_key() + 1);
+    CHECK(ui.gs == GS_OVER && ui.why == WHY_KEY, "a wrong key: game over");
+    panel_ms(300);
+    shot("over-nome");
+    wait_gs(GS_NAME);
+    CHECK(ui.gs == GS_NAME, "a score for the ranking: the name");
+    btn(B_OCTUP); btn(B_RIGHT); btn(B_OCTUP); btn(B_OCTUP); btn(B_RIGHT); btn(B_OCTDN);
+    CHECK(ui.name[0] == 'B' && ui.name[1] == 'C' && ui.name[2] == 'Z', "the letters (%.3s)", ui.name);
+    panel_ms(60);
+    shot("name");
+    btn(B_PLAY);
+    CHECK(ui.gs == GS_BOARD && ui.rank == 0 && lb.e[0].score == 36, "saved, first (%d)", lb.e[0].score);
+    panel_ms(60);
+    shot("board");
+
+    /* with the time: PAUTA alone, 6 s */
+    btn(B_PATCH);
+    btn(B_GLOBE); btn(B_OCTUP); btn(B_GLOBE);
+    btn(B_RIGHT); btn(B_RIGHT);
+    CHECK(ui.mode == MODE_PAUTA, "mode PAUTA");
+    key(0);
+    wait_gs(GS_ASK);
+    CHECK(ui.phase == PH_PAUTA && ui.limit == 6000u, "PAUTA, 6 s");
+    panel_ms(2500);
+    shot("clock");
+    key(target_key() + 2 <= 36 ? target_key() + 2 : target_key() - 2);
+    CHECK(ui.gs == GS_OVER, "a wrong key");
+    panel_ms(100);
+    shot("over-pauta");
+    wait_gs(GS_BOARD);
+    CHECK(ui.gs == GS_BOARD, "no score: straight to the ranking");
+    panel_ms(700);
+    key(5);
+    CHECK(ui.gs == GS_INTRO, "a key: again");
+    wait_gs(GS_ASK);
+    panel_ms(6200);
     CHECK(ui.gs == GS_OVER && ui.why == WHY_TIME, "6 s: TEMPO");
     shot("over-time");
-    /* the staff, every note */
-    for (i = 0; i < (int)NR_NOTES; i++) {
-        char nm[16];
-        ui.gs = GS_ASK, ui.phase = PH_PAUTA, ui.cur = (uint8_t)i, ui.ask_t = fm1_ms, ui.limit = 99999, ui.dirty = 1;
-        panel_ms(40);
-        snprintf(nm, sizeof nm, "staff-%02d", i);
-        if (i == 0 || i == 6 || i == 14) shot(nm);
-    }
-    panel_button(B_PATCH, 1); panel_ms(30); panel_button(B_PATCH, 0); panel_ms(30);
-    CHECK(ui.gs == GS_TITLE, "PATCH: the title");
-    panel_init();                                  /* a power cycle: the record read back */
-    CHECK(ui.best == 36, "the record after a power cycle (%d)", ui.best);
+
+    btn(B_PATCH);
+    panel_ms(60);
+    shot("title-ranked");
+    panel_init();                                  /* a power cycle: the ranking and the settings read back */
+    CHECK(lb.e[0].score == 36 && lb.e[0].n[0] == 'B' && ui.set[SET_TIME] == 1, "kept over a power cycle");
     printf("%s (%d failures)\n", fails ? "FAILED" : "ok", fails);
     return fails != 0;
 }

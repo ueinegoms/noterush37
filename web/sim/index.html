@@ -7,12 +7,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NOTE RUSH 37</title>
 <style>
-  :root { --bg: #02030c; --cy: #00f0ff; --mg: #ff28c8; --dim: #6f7c9a; --line: #1d2a5a; }
+  :root { --bg: #1B0093; --cy: #1C3DF7; --mg: #FFFF5E; --dim: #8294B2; --line: #22126A; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--cy); font: 13px/1.3 system-ui, sans-serif; user-select: none;
          -webkit-user-select: none; touch-action: manipulation; }
   header { padding: 12px 16px 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
-  header h1 { margin: 0; font-size: 22px; color: var(--mg); letter-spacing: 3px; text-shadow: 0 0 10px var(--mg); }
+  header h1 { margin: 0; font-size: 22px; color: #fff; letter-spacing: 3px; font-family: "JetBrains Mono", monospace; }
   header span { color: var(--dim); }
   /* the panel: the SMK-37 Pro's arrangement, left to right; the blocks wrap on narrow windows */
   .smk { margin: 6px auto; max-width: 1500px; padding: 16px; border: 1px solid var(--cy); border-radius: 18px;
@@ -96,11 +96,12 @@
 </div>
 <div class="help">O painel do SMK-37: a tela, os botões, K1..K8 sobre os 16 pads, os faders, as teclas (DÓ3..DÓ6).
   <b>Título:</b> &lt; &gt; ou K1 escolhem o modo (TODAS, NOME, PAUTA, OUVIDO); uma tecla ou SEQ PLAY começa.
-  <b>NOME:</b> toque a nota escrita, em qualquer oitava. <b>PAUTA:</b> toque exatamente a tecla da pauta (DÓ4 = a tecla do meio).
+  <b>GLOBE:</b> configurações (tempo, som, notas iniciais, acertos por fase; &lt; &gt; a linha, OCT/K1..K4 o valor).
+  <b>NOME:</b> toque a letra (C..B), em qualquer oitava. <b>PAUTA:</b> toque exatamente a tecla da pauta (C4 = a tecla do meio).
   <b>OUVIDO:</b> toque a nota que soou, qualquer oitava (SEQ PLAY ou um pad repete). 3 acertos seguidos passam de fase;
-  depois de OUVIDO entra uma nota nova. Errou ou 6 s sem tocar: fim. PATCH volta ao título. Os pads são o medidor de combo;
-  o recorde fica guardado (neste browser, como o teclado guarda na flash).
-  Teclado do computador: A W S E D F T G Y H U J K = teclas (começa no DÓ4), Z / X = oitava. Um teclado MIDI também toca.</div>
+  depois de OUVIDO entra uma nota nova. Errou ou o tempo acabou: fim, e o nome (OCT▲▼, &lt; &gt;, PLAY envia) vai pro ranking
+  (guardado neste browser, como o teclado guarda na flash). PATCH volta ao título. Os pads são o medidor de combo.
+  Teclado do computador: A W S E D F T G Y H U J K = teclas (começa no C4), Z / X = oitava; setas, Enter, Esc, C = botões. Um teclado MIDI também toca.</div>
 <div id="start">clique pra ligar o som</div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -120,10 +121,10 @@ function drawFb(fb) {
 }
 
 // ---- buttons (HAL ids): SMK name, what it does in Vector37 (held: the knobs' set)
-const BTN = [["KNOB BANK", ""], ["FADER BANK", ""], ["<", "modo"], [">", "modo"],
-  ["OCTAVE-", ""], ["OCTAVE+", ""], ["ARP", ""], ["NOTE REPEAT", ""], ["SCALE", ""],
-  ["CHORD", ""], ["GLOBE", ""], ["BT", ""], ["PATCH", "menu"],
-  ["PARA", ""], ["FX", ""], ["SEQ", ""], ["SEQ PLAY", "jogar · repetir"],
+const BTN = [["KNOB BANK", ""], ["FADER BANK", ""], ["<", "modo · ← "], [">", "modo · →"],
+  ["OCTAVE-", "▼ · ↓"], ["OCTAVE+", "▲ · ↑"], ["ARP", ""], ["NOTE REPEAT", ""], ["SCALE", ""],
+  ["CHORD", ""], ["GLOBE", "config · C"], ["BT", ""], ["PATCH", "menu · Esc"],
+  ["PARA", ""], ["FX", ""], ["SEQ", ""], ["SEQ PLAY", "jogar · Enter"],
   ["SEQ REC", ""]];
 const btnEl = [];
 function button(b, parent) {
@@ -137,7 +138,7 @@ function button(b, parent) {
 [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].forEach((b) => button(b, $("grid6")));   // under the faders, 2 x 6
 
 // ---- knobs K1..K8 (HAL encoders 0..7): the selected planets (none selected: the orbit and the moon)
-const KN = ["MODO", "", "", "", "", "", "", ""];
+const KN = ["MODO", "SOM", "NOTAS", "ACERTOS", "", "", "", ""];
 const KC = ["#ff5a5a", "#ffa03c", "#f0e146", "#64e16e", "#3cd2e6", "#5a8cff", "#be6eff", "#ff6ec8"];   // the knobs' colours (screen labels, satellites)
 const GC = ["#3c8cff", "#ff961e", "#aa5aff", "#ff3c6e"];   // the pad groups: SELECT, MODE, FILTER, MUTE
 for (let e = 0; e < 8; e++) {
@@ -214,8 +215,16 @@ for (let k = 0; k < 37; k++) {
   keyEl[k] = el;
   $("keys").appendChild(el);
 }
-function keyDown(k, d) { keyEl[k].classList.toggle("down", !!d); send({ type: "key", key: k, down: d }); }
+const keyT = [];                                       // (a release at least 40 ms after its press: the firmware scans
+function keyDown(k, d) {                               // the keys every 16 ms, a quicker tap would pass unseen)
+  const wait = d ? 0 : 40 - (performance.now() - (keyT[k] || 0));
+  if (d) keyT[k] = performance.now();
+  if (wait > 0) return setTimeout(() => keyDown(k, 0), wait);
+  keyEl[k].classList.toggle("down", !!d); send({ type: "key", key: k, down: d });
+}
 const KB = "awsedftgyhujk", held = {};
+// the buttons from the computer keyboard: arrows (< > OCT- OCT+), Enter (PLAY), Esc (PATCH), C (GLOBE)
+const NAV = { ArrowLeft: 2, ArrowRight: 3, ArrowDown: 4, ArrowUp: 5, Enter: 16, Escape: 12, c: 10, C: 10 };
 let kbo = 12;
 addEventListener("keydown", (ev) => {
   if (ev.repeat || ev.ctrlKey || ev.metaKey) return;
@@ -224,6 +233,7 @@ addEventListener("keydown", (ev) => {
   else if (c === "z") kbo = Math.max(0, kbo - 12);
   else if (c === "x") kbo = Math.min(24, kbo + 12);
   else if (c >= "1" && c <= "8") { held[c] = -1; send({ type: "pad", pad: +c - 1, vel: 110 }); }
+  else if (NAV[ev.key] !== undefined) { ev.preventDefault(); const b = NAV[ev.key]; send({ type: "button", b, down: 1 }); send({ type: "button", b, down: 0 }); }
 });
 addEventListener("keyup", (ev) => {
   const c = ev.key.toLowerCase();
@@ -234,6 +244,7 @@ addEventListener("keyup", (ev) => {
 
 // ---- the device's frames: the pads light like their LEDs
 function frame(m) {
+  if (m.game !== undefined) window.simGame = m.game;
   if (m.fb) drawFb(m.fb);
   if (m.pads) m.pads.forEach((c, p) => {
     let r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;

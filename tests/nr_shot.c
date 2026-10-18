@@ -60,10 +60,32 @@ int main(void)
     /* a game without a time limit */
     for (i = 0; i < 60; i++) panel_ms(20);
     press(12);
-    CHECK(ui.gs == GS_INTRO, "a key starts");
     panel_ms(100);
-    CHECK(voices() == 0, "the key that starts is silent (%u)", voices());
+    CHECK(ui.gs == GS_TITLE && voices() > 0, "on the title a key just plays (%d, %u)", ui.gs, voices());
     lift(12);
+    {                                              /* the sound's controls */
+        int16_t cut = pt.c[0][CP_CUT], aa = pt.g[G_AA];
+        panel_enc(0, 3); panel_ms(40);
+        CHECK(pt.c[0][CP_CUT] == clamp(cut + 6, 0, 127), "K1: BRILHO");
+        CHECK(str_eq(ui.msg, "BRILHO ") == 0 && ui.msg[0] == 'B', "K1 said in the header (%s)", ui.msg);
+        panel_ms(60);
+        shot("knob");
+        panel_enc(2, -2); panel_ms(40);
+        CHECK(pt.g[G_AA] == clamp(aa - 4, 0, 127), "K3: ATAQUE");
+        panel_fader(0, 30); panel_ms(40);
+        CHECK(pt.g[G_VOLUME] == 30, "F1: VOLUME (%d)", pt.g[G_VOLUME]);
+        panel_fader(1, 90); panel_ms(40);
+        CHECK(pt.g[G_RVMIX] == 90, "F2: REVERB");
+        panel_fader(0, 100); panel_ms(40);
+        panel_wheel(1, 485); panel_ms(400);
+        CHECK(ui.vib > 20000, "the mod wheel: vibrato (%d)", ui.vib);
+        { int32_t lo = 99999, hi = -99999; for (i = 0; i < 40; i++) { panel_ms(5); lo = joy_x < lo ? joy_x : lo; hi = joy_x > hi ? joy_x : hi; }
+          CHECK(hi - lo > 4000, "vibrato moves the pitch (%d..%d)", lo, hi); }
+        panel_wheel(1, 615); panel_ms(600);
+        CHECK(ui.vib < 500, "mod wheel down: none (%d)", ui.vib);
+    }
+    btn(B_PLAY);
+    CHECK(ui.gs == GS_INTRO, "PLAY starts");
     panel_ms(100);
     shot("start");
     wait_gs(GS_ASK);
@@ -92,7 +114,7 @@ int main(void)
     CHECK(voices() > 0, "OUVIDO: the note sounds");
     answer(); answer(); answer();
     wait_gs(GS_INTRO);
-    CHECK(ui.unlocked == 4u, "all phases: a new note (%d)", ui.unlocked);
+    CHECK(ui.unlocked == 4u && new_note() == 10u, "all phases: a new note, F4 (%d, %d)", ui.unlocked, new_note());
     panel_ms(100);
     shot("intro");
     wait_gs(GS_ASK);
@@ -117,7 +139,7 @@ int main(void)
     btn(B_GLOBE); btn(B_OCTUP); btn(B_GLOBE);
     btn(B_RIGHT); btn(B_RIGHT);
     CHECK(ui.mode == MODE_PAUTA, "mode PAUTA");
-    key(0);
+    btn(B_PLAY);
     wait_gs(GS_ASK);
     CHECK(ui.phase == PH_PAUTA && ui.limit == 6000u, "PAUTA, 6 s");
     panel_ms(2500);
@@ -128,14 +150,22 @@ int main(void)
     shot("over-pauta");
     wait_gs(GS_BOARD);
     CHECK(ui.gs == GS_BOARD, "no score: straight to the ranking");
-    panel_ms(700);
     key(5);
-    CHECK(ui.gs == GS_INTRO, "a key: again");
+    CHECK(ui.gs == GS_BOARD, "the ranking: a key just plays");
+    btn(B_PLAY);
+    CHECK(ui.gs == GS_INTRO, "PLAY: again");
     wait_gs(GS_ASK);
     panel_ms(6200);
     CHECK(ui.gs == GS_OVER && ui.why == WHY_TIME, "6 s: TEMPO");
     shot("over-time");
 
+    CHECK(ORDER[7] == 14u && ORDER[15] == 0u && note_midi(0) == 48u && note_midi(21) == 84u,
+          "the middle octave, the upper, the lower last");
+    for (i = 0; i < 2; i++) {                      /* the staff's ends: C3 (four ledger lines), C6 */
+        ui.gs = GS_ASK, ui.phase = PH_PAUTA, ui.cur = (uint8_t)(i ? 21 : 0), ui.ask_t = fm1_ms, ui.limit = 0, ui.dirty = 1;
+        panel_ms(40);
+        shot(i ? "staff-c6" : "staff-c3");
+    }
     btn(B_PATCH);
     panel_ms(60);
     shot("title-ranked");

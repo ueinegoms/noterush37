@@ -107,7 +107,7 @@
   <div class="top">
     <div class="blk">
       <div><input class="v w" id="pitch" type="range" min="450" max="630" value="540"><div class="lab">PITCH</div></div>
-      <div><input class="v w" id="mod" type="range" min="0" max="130" value="0"><div class="lab">MOD</div></div>
+      <div><input class="v w" id="mod" type="range" min="0" max="130" value="0"><div class="lab">VIBRATO</div></div>
       <div class="scr"><canvas id="screen" width="240" height="240"></canvas><div class="nav" id="nav"></div></div>
     </div>
     <div class="mid" id="mid"></div>
@@ -116,8 +116,11 @@
   <div class="keys" id="keys"></div>
 </div>
 <div class="help">O painel do SMK-37: a tela, os botões, K1..K8 sobre os 16 pads, os faders, as teclas (DÓ3..DÓ6).
-  <b>Título:</b> &lt; &gt; ou K1 escolhem o modo (TODAS, NOME, PAUTA, OUVIDO); uma tecla ou SEQ PLAY começa.
+  As teclas sempre tocam; só respondem quando há pergunta. <b>SEQ PLAY</b> faz a ação da tela (jogar, enviar, de novo,
+  ouvir de novo); <b>PATCH</b> volta. <b>Título:</b> &lt; &gt; escolhem o modo (TODAS, NOME, PAUTA, OUVIDO).
   <b>GLOBE:</b> configurações (tempo, som, notas iniciais, acertos por fase; &lt; &gt; a linha, OCT/K1..K4 o valor).
+  <b>Som:</b> K1..K8 os parâmetros, os faders volume/reverb/delay/chorus, MOD vibrato, PITCH bend.
+  As notas entram pela oitava do meio (C4..B4), depois a de cima (C5..C6), por fim a de baixo (C3..B3).
   <b>NOME:</b> toque a letra (C..B), em qualquer oitava. <b>PAUTA:</b> toque exatamente a tecla da pauta (C4 = a tecla do meio).
   <b>OUVIDO:</b> toque a nota que soou, qualquer oitava (SEQ PLAY ou um pad repete). 3 acertos seguidos passam de fase;
   depois de OUVIDO entra uma nota nova. Errou ou o tempo acabou: fim, e o nome (OCT▲▼, &lt; &gt;, PLAY envia) vai pro ranking
@@ -160,7 +163,7 @@ function button(b, parent) {
 [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].forEach((b) => button(b, $("grid6")));   // under the faders, 2 x 6
 
 // ---- knobs K1..K8 (HAL encoders 0..7): the selected planets (none selected: the orbit and the moon)
-const KN = ["MODO", "SOM", "NOTAS", "ACERTOS", "", "", "", ""];
+const KN = ["BRILHO", "RESSON.", "ATAQUE", "RELEASE", "DRIVE", "SALA", "ECO TEMPO", "ECO REPETE"];
 const KC = ["#ff5a5a", "#ffa03c", "#f0e146", "#64e16e", "#3cd2e6", "#5a8cff", "#be6eff", "#ff6ec8"];   // the knobs' colours (screen labels, satellites)
 const GC = ["#3c8cff", "#ff961e", "#aa5aff", "#ff3c6e"];   // the pad groups: SELECT, MODE, FILTER, MUTE
 for (let e = 0; e < 8; e++) {
@@ -190,7 +193,7 @@ for (let p = 0; p < 16; p++) {
 
 // ---- faders: the path. Not held, a handle shows where the sound's value is (a new sound moves them), so a touch
 // goes on from there; held, it sends (the firmware glides a moved fader's value to it, as on the unit)
-const FN = ["FAMILY", "SIZE", "SPEED", "MORPH"], faderEl = [], holding = [false, false, false, false, false];
+const FN = ["VOLUME", "REVERB", "DELAY", "CHORUS"], faderEl = [], holding = [false, false, false, false, false];
 for (let i = 0; i < 4; i++) {
   const d = mk("", `<input class="v" type="range" min="0" max="127" value="64"><div class="lab">${FN[i]}</div>`);
   d.firstChild.addEventListener("input", (ev) => send({ type: "fader", i, v: +ev.target.value }));

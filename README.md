@@ -7,15 +7,18 @@ simulator; the game in `firmware/src/game.c` and `gdraw.c` in place of Vector37'
 In the web version's look (violet, the electric blue card, yellow). FASE 1 MEMORIZE shows each new note; then:
 
 - **NOME**: the letter alone (C .. B): play it, any octave (+3)
-- **PAUTA**: the staff alone (C4 .. C6): play that very key (+4)
+- **PAUTA**: the staff alone (C3 .. C6): play that very key (+4)
 - **OUVIDO**: the note heard: play it, any octave (+5)
 
-A right answer: lightning from the key to the combo (as many bolts as the points, brighter the quicker). N right in
-a row: the next phase; after OUVIDO a new note (centre-out from B4). A wrong key or the time out: game over, a name
-(AAA: OCT+ OCT- the letter, < > the place, PLAY saves) for the local top 5. Title: < > or K1 the mode, a key (silent)
-or SEQ PLAY starts; GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the web; SOM; NOTAS INICIAIS;
-ACERTOS/FASE); PATCH: the title. The pads: the combo meter, the start's sweep, the lightning, game over. The ranking
-and the settings are kept in flash.
+The notes come in by octave: the middle one (C4 .. B4), then the upper (C5 .. C6), the lower (C3 .. B3) last. A right
+answer: lightning in an arc from the bottom left corner to the combo, and across the pads (erratic, as a bolt); ball
+lightning round the combo while it runs. A wrong key or the time out: game over, a name (AAA) for the local top 5.
+
+The keys always play; they answer only when asked. SEQ PLAY does what the screen offers (JOGAR, ENVIAR, JOGAR DE
+NOVO, the note again); PATCH goes back. Title: < > the mode; GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the
+web; SOM; NOTAS INICIAIS; ACERTOS/FASE). The sound: K1..K8 BRILHO, RESSONÂNCIA, ATAQUE, RELEASE, DRIVE, SALA, ECO
+TEMPO, ECO REPETE; the faders VOLUME, REVERB, DELAY, CHORUS; the mod wheel vibrato, the pitch wheel a bend. The
+simulator page installs it on the keyboard (CONECTAR, INSTALAR: Chrome / Edge).
 
 ```
 MODEL=elite sh build.sh            # build/noterush37-elite.fwsc (JieLi toolchain + AC79 SDK V1.2.1, see below)

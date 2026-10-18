@@ -72,7 +72,7 @@ static void button(int32_t y, int32_t h, const char *s, uint16_t bg, uint16_t fg
 }
 
 /* ------------------------------------------------------------- the staff --- */
-/* treble clef, step d: 0 = C4 .. 14 = C6; the lines E4 G4 B4 D5 F5 (steps 2..10), 10 px apart; mid: the B4 line */
+/* treble clef, step d: -7 = C3 .. 0 = C4 .. 14 = C6; the lines E4 G4 B4 D5 F5 (steps 2..10), 10 px apart; mid: the B4 line */
 #define ST_X0 16
 #define ST_X1 224
 #define ST_NX 146
@@ -111,7 +111,7 @@ static void clef(int32_t x0, int32_t y0, uint16_t c)
 static void note_head(int32_t mid, int32_t d, int32_t x, uint16_t col)
 {
     int32_t k, y = step_y(mid, d);
-    for (k = 0; k >= d; k -= 2)                    /* ledger lines: C4 below, A5 / C6 above */
+    for (k = 0; k >= d; k -= 2)                    /* ledger lines: C4 .. D3 below, A5 / C6 above */
         cv_rect(x - 12, step_y(mid, k), 25, 1, C_STAFF);
     for (k = 12; k <= d; k += 2)
         cv_rect(x - 12, step_y(mid, k), 25, 1, C_STAFF);
@@ -128,12 +128,13 @@ static void staff(int32_t mid)
         cv_rect(ST_X0, step_y(mid, k), ST_X1 - ST_X0, 1, C_STAFF);
     clef(ST_X0 + 18, step_y(mid, 4), C_CLEF);
 }
-static int32_t step_of(uint32_t midi)              /* the staff step of a white key C4 .. C6 (-1: none) */
+static int32_t step_of(uint32_t midi, int32_t *d)  /* the staff step of a white key C3 .. C6 (0: none) */
 {
     static const int8_t ST[12] = {0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6};
-    if (midi < 60u || midi > 84u || ST[midi % 12u] < 0)
-        return -1;
-    return ST[midi % 12u] + 7 * (int32_t)(midi / 12u - 5u);
+    if (midi < 48u || midi > 84u || ST[midi % 12u] < 0)
+        return 0;
+    *d = ST[midi % 12u] + 7 * ((int32_t)(midi / 12u) - 5);
+    return 1;
 }
 
 /* ------------------------------------------------------------- the ear --- */
@@ -165,7 +166,7 @@ static void note_label(char *b, uint32_t midi, int octave)   /* "A", "A4", "Eb4"
 static void header(void)
 {
     char b[12];
-    text_b(8, 10, &FONT_S, "NOTE RUSH", C_WHITE);
+    text_b(8, 10, &FONT_S, ui.msg[0] ? ui.msg : "NOTE RUSH", ui.msg[0] ? C_YEL : C_WHITE);   /* (or a knob's value) */
     b[0] = 'x';
     num(b + 1, ui.combo);
     if (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK) {   /* a combo running: its ball lightning */
@@ -191,8 +192,8 @@ static void question(uint16_t col)                 /* the question as asked: the
     if (ui.phase == PH_NOME)
         text_c(120, 70, &FONT_H, LETTER[ui.cur % 7u], col);
     else if (ui.phase == PH_PAUTA) {
-        staff(130);
-        note_head(130, ui.cur, ST_NX, col);
+        staff(125);
+        note_head(125, note_step(ui.cur), ST_NX, col);
     } else {
         speaker(116, 100, C_YEL, ui.tone_off ? C_WHITE : C_YEL);
         button(146, 28, "OUVIR NOTA (PLAY)", C_YEL, C_BOX);
@@ -216,11 +217,11 @@ static void card_over(void)
     uint32_t m = note_midi(ui.cur);
     card_title(PHASE_TITLE[ui.phase]);
     if (ui.phase == PH_PAUTA) {                    /* the right one, and the one played (where the staff has it) */
-        int32_t s = ui.why == WHY_KEY ? step_of(ui.played) : -1;
-        staff(130);
-        note_head(130, ui.cur, ST_NX - 22, C_OK);
-        if (s >= 0)
-            note_head(130, s, ST_NX + 26, C_ERR);
+        int32_t s;
+        staff(125);
+        note_head(125, note_step(ui.cur), ST_NX - 22, C_OK);
+        if (ui.why == WHY_KEY && step_of(ui.played, &s))
+            note_head(125, s, ST_NX + 26, C_ERR);
     } else
         text_c(120, 70, &FONT_H, LETTER[ui.cur % 7u], C_OK);
     str_cpy(b, ui.why == WHY_TIME ? "TEMPO! - ERA " : "ERROU - ERA ", sizeof b);
@@ -235,8 +236,8 @@ static void card_intro(void)
     card_title("FASE 1 - MEMORIZE");
     note_label(b, note_midi(d), 1);
     text_c(120, 62, &FONT_XL, b, C_YEL);
-    staff(160);
-    note_head(160, (int32_t)d, ST_NX, C_YEL);
+    staff(150);
+    note_head(150, note_step(d), ST_NX, C_YEL);
 }
 static void score_big(void)
 {
@@ -292,7 +293,7 @@ static void card_board(void)
 {
     score_big();
     lb_rows(98, ui.rank);
-    button(194, 30, "JOGAR DE NOVO", C_YEL, C_BOX);
+    button(194, 30, "JOGAR DE NOVO (PLAY)", C_YEL, C_BOX);
 }
 static void card_setup(void)
 {
@@ -336,11 +337,16 @@ static void title(void)                            /* the web's home: the rankin
     text_b(120 - text_w(&FONT_XL, "RUSH") / 2 + 3, 113, &FONT_XL, "RUSH", C_CARD);
     text_c(120, 110, &FONT_XL, "RUSH", C_YEL);
     cv_rect(CARD_X + 6, 166, CARD_W - 12, 40, C_CARD);
-    text_c(120, 170, &FONT_L, "JOGAR", C_WHITE);
-    str_cpy(b, "< ", sizeof b);
-    str_cat(b, MODE_NAME[ui.mode], sizeof b);
-    str_cat(b, " >  GLOBE: CONFIG", sizeof b);
-    text_c(120, 216, &FONT_S, b, C_MUT);
+    text_b(64, 170, &FONT_L, "JOGAR", C_WHITE);
+    text_b(150, 178, &FONT_S, "(PLAY)", C_YEL);
+    if (ui.msg[0])                                 /* (a knob's value, or the board layer's line) */
+        text_c(120, 216, &FONT_S, ui.msg, C_YEL);
+    else {
+        str_cpy(b, "< ", sizeof b);
+        str_cat(b, MODE_NAME[ui.mode], sizeof b);
+        str_cat(b, " >  GLOBE: CONFIG", sizeof b);
+        text_c(120, 216, &FONT_S, b, C_MUT);
+    }
 }
 static void bolts(void)                            /* the lightning over everything (game.c: lightning): 1 px of */
 {                                                  /* plain yellow, jagged; it runs up in 0.2 s, then draws back */
@@ -403,10 +409,6 @@ static void scene(void)
     }
     if (bolt.t)
         bolts();
-    if (ui.msg[0]) {                               /* (the board layer's line, over the card's foot) */
-        cv_rect(0, 204, 240, 36, C_BOX);
-        text_c(120, 214, &FONT_S, ui.msg, C_WHITE);
-    }
 }
 static void strip(uint32_t i)
 {

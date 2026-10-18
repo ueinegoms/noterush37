@@ -4,14 +4,17 @@
  * As the web version (NOTE RUSH CYBERFUNK):
  *   FASE 1 MEMORIZE  the new notes shown (name and staff) and heard
  *   FASE 2 NOME      the letter alone (C .. B): play it, any octave (+3)
- *   FASE 3 PAUTA     the staff alone (C4 .. C6): play that very key (+4)
+ *   FASE 3 PAUTA     the staff alone (C3 .. C6): play that very key (+4)
  *   FASE 4 OUVIDO    the note heard: play it, any octave (+5)
- * A right answer: lightning from the key to the combo; N in a row (ACERTOS) move to the next phase; after OUVIDO a
- * new note (centre-out from B4). A wrong key, or the time out (TEMPO; SEM LIMITE: none): game over, a name (AAA) for
- * the local ranking (top 5, in flash).
- * Controls: the keys answer; title: < > or K1 the mode, a key or PLAY starts (that key silent); GLOBE: the settings
- * (TEMPO, SOM, NOTAS INICIAIS, ACERTOS/FASE: < > the row, K1 or OCT- OCT+ the value); PLAY or a pad: the OUVIDO note
- * again; the name: OCT+ OCT- (or K1) the letter, < > the place, PLAY saves, PATCH skips; PATCH: back to the title. */
+ * A right answer: lightning in an arc from the bottom left corner to the combo, and across the pads; N in a row
+ * (ACERTOS) move to the next phase; after OUVIDO a new note: the middle octave C4 .. B4 first, then the upper one
+ * C5 .. C6, the lower one C3 .. B3 last. A wrong key, or the time out (TEMPO; SEM LIMITE: none): game over, a name
+ * (AAA) for the local ranking (top 5, in flash).
+ * The keys always play (the sound chosen in the settings); they answer only when asked. SEQ PLAY does what the
+ * screen offers (JOGAR, ENVIAR, JOGAR DE NOVO, the OUVIDO note again: a pad too); PATCH goes back. Title: < > the
+ * mode; GLOBE: the settings (TEMPO, SOM, NOTAS INICIAIS, ACERTOS/FASE: < > the row, K1..K4 or OCT- OCT+ the value).
+ * The name: OCT+ OCT- the letter, < > the place. The sound: K1..K8 its parameters, the faders VOLUME, REVERB, DELAY,
+ * CHORUS, the mod wheel vibrato, the pitch wheel a bend. */
 #if !BOARD_SMK37
 #error "NOTE RUSH 37 is for the SMK-37 (Pro / Elite / MKE-P37)"
 #endif
@@ -19,13 +22,12 @@ enum { B_KNOBBANK, B_FADERBANK, B_LEFT, B_RIGHT, B_OCTDN, B_OCTUP, B_ARP, B_REPE
        B_BT, B_PATCH, B_PARA, B_FX, B_SEQ, B_PLAY, B_REC };
 #define PANEL_KEYS() fm1_in.keys
 
-#define NR_NOTES 15u                               /* the white keys C4 .. C6 */
+#define NR_NOTES 22u                               /* the white keys C3 .. C6 (index 0 = C3) */
 #define NR_TONE_MS 900u                            /* a note played for the player */
 #define NR_OK_MS 340u                              /* a right answer shown (the lightning's length) */
 #define NR_INTRO_MS 1500u                          /* a new note shown */
 #define NR_OVER_MS 1600u                           /* game over shown, then the name or the ranking */
-#define NR_BOARD_LOCK_MS 600u                      /* the ranking: keys ignored this long (a late key is no restart) */
-#define NR_START_MS 350u                           /* the start: the pads' sweep before the first note sounds */
+#define NR_START_MS 350u                           /* the start: the pads' lightning before the first note sounds */
 #define NR_KEY0 48                                 /* the bottom key: C3 */
 #define NR_LB 5u                                   /* the ranking's places */
 
@@ -35,7 +37,9 @@ enum { MODE_ALL, MODE_NOME, MODE_PAUTA, MODE_OUVIDO, MODE_N };
 enum { WHY_KEY = 1, WHY_TIME };
 static const char *const MODE_NAME[MODE_N] = {"TODAS", "NOME", "PAUTA", "OUVIDO"};
 static const uint8_t PHASE_BONUS[PH_N] = {3, 4, 5};
-static const uint8_t ORDER[NR_NOTES] = {6, 7, 5, 8, 4, 9, 3, 10, 2, 11, 1, 12, 0, 13, 14};   /* centre-out from B4 */
+static const uint8_t ORDER[NR_NOTES] = {7, 8, 9, 10, 11, 12, 13,            /* C4 .. B4 */
+                                        14, 15, 16, 17, 18, 19, 20, 21,     /* C5 .. C6 */
+                                        0, 1, 2, 3, 4, 5, 6};               /* C3 .. B3 */
 static const uint8_t SEMI[7] = {0, 2, 4, 5, 7, 9, 11};
 static const char *const LETTER[7] = {"C", "D", "E", "F", "G", "A", "B"};
 static const char *const CHROMA[12] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
@@ -51,6 +55,14 @@ static const char *const SND_NAME[] = {"E.PIANO", "MARIMBA", "MUSIC BOX", "HARPA
                                        "KALIMBA", "FLAUTA"};
 #define NSND (sizeof SND / sizeof SND[0])
 static const uint8_t SET_MIN[SET_N] = {0, 0, 1, 2}, SET_MAX[SET_N] = {5, NSND - 1u, 8, 12}, SET_DEF[SET_N] = {1, 0, 3, 3};
+
+/* the sound's controls: K1..K8 (a corner parameter: all four corners together) and the faders */
+typedef struct { const char *name; uint8_t corner, id; } sctl_t;
+static const sctl_t KNOB[8] = {{"BRILHO", 1, CP_CUT}, {"RESSON\xC2NCIA", 1, CP_RES}, {"ATAQUE", 0, G_AA},
+                               {"RELEASE", 0, G_AR}, {"DRIVE", 0, G_DRIVE}, {"SALA", 0, G_RVSIZE},
+                               {"ECO TEMPO", 0, G_DLTIME}, {"ECO REPETE", 0, G_DLFB}};
+static const sctl_t FADER[4] = {{"VOLUME", 0, G_VOLUME}, {"REVERB", 0, G_RVMIX}, {"DELAY", 0, G_DLMIX},
+                                {"CHORUS", 0, G_CHMIX}};
 
 /* the ranking: a store object of its own (storage.c; scenes.c's sounds: OBJ_SCENE0) */
 #define LB_OBJ (OBJ_SCENE0 + 1u)
@@ -84,8 +96,10 @@ static struct {
     uint32_t ask_t, limit;                         /* the answer's clock: started at, runs this long (0: no limit) */
     uint32_t tone_off, tone_due;                   /* the heard note: its note off at; a note due at */
     uint8_t tone_note, due_note;
-    uint64_t keys, quiet;                          /* the keys held; ... the ones that started a game (silent) */
-    uint32_t start_t, flash_t;                     /* the pads: the start's sweep, a right answer's flash, from */
+    uint64_t keys;
+    uint32_t flash_t;                              /* game over's red, from */
+    int32_t bend, vib;                             /* the pitch wheel (Q15), the mod wheel (vibrato depth, Q15) */
+    uint8_t fad[4], fad_ready;                     /* the faders as last taken */
     uint32_t rnd;
     uint8_t dirty;                                 /* everything to draw again (main.c, console.c set it) */
     uint8_t redraw;                                /* the strips to draw again (D_*) */
@@ -93,13 +107,13 @@ static struct {
     uint32_t msg_until;
 } ui = {.rnd = 0x9E3779B9u, .name = {'A', 'A', 'A'}};
 
-static void ui_say(const char *a, const char *b)   /* a line over the card (the board layer: UPDATE MODE ..) */
+static void ui_say(const char *a, const char *b)   /* a short line in the header (title: its foot) for 2 s */
 {
     str_cpy(ui.msg, a, sizeof ui.msg);
     if (b)
         str_cat(ui.msg, b, sizeof ui.msg);
     ui.msg_until = fm1_ms + 2000u;
-    ui.redraw |= D_FOOT;
+    ui.redraw |= D_HEAD | D_FOOT;
 }
 
 static uint32_t rnd(void)
@@ -114,10 +128,10 @@ static uint32_t since(uint32_t t)                  /* ms since t (a stamp: ms | 
     int32_t d = (int32_t)(fm1_ms - t);
     return d < 0 ? 0u : (uint32_t)d;
 }
-static uint32_t note_midi(uint32_t d) { return 60u + SEMI[d % 7u] + 12u * (d / 7u); }   /* step 0 = C4 (60) */
+static uint32_t note_midi(uint32_t i) { return 48u + SEMI[i % 7u] + 12u * (i / 7u); }   /* index 0 = C3 (48) */
+static int32_t note_step(uint32_t i) { return (int32_t)i - 7; }   /* its staff step: 0 = C4 (gdraw.c) */
 static uint32_t phase_first(void) { return ui.mode == MODE_ALL ? PH_NOME : ui.mode - 1u; }
 static uint32_t new_note(void) { return ORDER[ui.unlocked - ui.intro_n]; }   /* (the intro's note) */
-static uint32_t best(void) { return lb.e[0].score; }
 
 /* ------------------------------------------------------------- sound --- */
 static void tone_stop(void)
@@ -145,6 +159,34 @@ static void preset_load(uint32_t n)                /* the sound: factory sound n
 {
     ev_push(EV_ALLOFF, 0, 0);
     preset_make(n % NFACT, &pt);
+    if (pt.g[G_BEND] < 2)
+        pt.g[G_BEND] = 2;                          /* (the wheels need a range: 2 semitones) */
+}
+static void sctl_say(const sctl_t *c)
+{
+    char b[8];
+    int32_t v = c->corner ? pt.c[0][c->id] : pt.g[c->id];
+    uint32_t n = 0;
+    if (v < 0)
+        b[n++] = '-', v = -v;
+    if (v >= 100)
+        b[n++] = (char)('0' + v / 100);
+    if (v >= 10)
+        b[n++] = (char)('0' + v / 10 % 10);
+    b[n++] = (char)('0' + v % 10);
+    b[n] = 0;
+    ui_say(c->name, " ");
+    str_cat(ui.msg, b, sizeof ui.msg);
+}
+static void sctl_set(const sctl_t *c, int32_t v, int rel)   /* rel: v is a change */
+{
+    uint32_t k;
+    if (c->corner)
+        for (k = 0; k < NC; k++)
+            pt.c[k][c->id] = (int16_t)clamp(rel ? pt.c[k][c->id] + v : v, CDESC[c->id].min, CDESC[c->id].max);
+    else
+        pt.g[c->id] = (int16_t)clamp(rel ? pt.g[c->id] + v : v, GDESC[c->id].min, GDESC[c->id].max);
+    sctl_say(c);
 }
 
 /* ------------------------------------------------------------- settings, ranking --- */
@@ -205,26 +247,13 @@ static void lb_add(void)
 }
 
 /* ------------------------------------------------------------- the lightning --- */
-/* as the web's (lightning.js): from points spread along the bottom edge up to the combo; as many bolts as the
- * phase's points; longer and more jagged the quicker the answer (1 s or less: full, 5 s or more: none) */
-static int32_t isqrt(int32_t v)
-{
-    int32_t r = 0, b = 1 << 14;
-    while (b > v)
-        b >>= 2;
-    while (b) {
-        if (v >= r + b)
-            v -= r + b, r = (r >> 1) + b;
-        else
-            r >>= 1;
-        b >>= 2;
-    }
-    return r;
-}
+/* the screen: as many bolts as the phase's points, each an arc from the bottom left corner up to the combo (a
+ * quadratic curve bent toward the top left), jagged off it; more pieces and wilder the quicker the answer (1 s or
+ * less: full, 5 s or more: none) */
 static void lightning(uint32_t react_ms)
 {
     int32_t k = react_ms <= 1000u ? 256 : react_ms >= 5000u ? 0 : 256 - (int32_t)(react_ms - 1000u) * 256 / 4000;
-    int32_t base = 7 + (41 * k >> 8), steps = 5 + (15 * k >> 8);
+    int32_t steps = 8 + (13 * k >> 8), jit = 3 + (8 * k >> 8), i;
     uint32_t b;
     if (k <= 0)
         return;
@@ -232,28 +261,54 @@ static void lightning(uint32_t react_ms)
     bolt.k = (uint8_t)(k > 255 ? 255 : k);
     bolt.n = ui.gain > NBOLT ? NBOLT : ui.gain;
     for (b = 0; b < bolt.n; b++) {
-        int32_t cx = (int32_t)((2u * b + 1u) * 120u / bolt.n) + (int32_t)(rnd() % 31u) - 15, cy = 239;
-        int32_t tx = 210 + (int32_t)(rnd() % 17u) - 8, ty = 17 + (int32_t)(rnd() % 9u) - 4;
-        int32_t dx = 0, dy = -256, i;
-        uint32_t np = 0;
-        bolt.p[b][np][0] = (int16_t)cx, bolt.p[b][np++][1] = (int16_t)cy;
-        for (i = 0; i < steps && np < BOLT_PTS - 1u; i++) {
-            int32_t ex = tx - cx, ey = ty - cy, d = isqrt(ex * ex + ey * ey), j, len;
-            if (d < base * 3 / 2)
-                break;
-            ex = ex * 256 / d, ey = ey * 256 / d;  /* toward the combo, half turned from the last way, a wobble */
-            dx = (dx + ex) / 2, dy = (dy + ey) / 2;
-            j = (int32_t)(rnd() % 205u) - 102;
-            ex = dx - dy * j / 256, ey = dy + dx * j / 256;
-            d = isqrt(ex * ex + ey * ey) | 1;
-            dx = ex * 256 / d, dy = ey * 256 / d;
-            len = base * (128 + (int32_t)(rnd() % 230u)) / 256;
-            cx = clamp(cx + dx * len / 256, 0, 239), cy = clamp(cy + dy * len / 256, 0, 239);
-            bolt.p[b][np][0] = (int16_t)cx, bolt.p[b][np++][1] = (int16_t)cy;
+        int32_t x0 = (int32_t)(rnd() % 12u), y0 = 239 - (int32_t)(rnd() % 12u);
+        int32_t x1 = 210 + (int32_t)(rnd() % 17u) - 8, y1 = 17 + (int32_t)(rnd() % 9u) - 4;
+        int32_t cx = 4 + (int32_t)(rnd() % 70u), cy = 8 + (int32_t)(rnd() % 70u), s2 = steps * steps;
+        for (i = 0; i <= steps; i++) {
+            int32_t u = steps - i, x = (u * u * x0 + 2 * u * i * cx + i * i * x1) / s2;
+            int32_t y = (u * u * y0 + 2 * u * i * cy + i * i * y1) / s2;
+            if (i && i < steps)
+                x += (int32_t)(rnd() % (2u * (uint32_t)jit + 1u)) - jit, y += (int32_t)(rnd() % (2u * (uint32_t)jit + 1u)) - jit;
+            bolt.p[b][i][0] = (int16_t)clamp(x, 0, 239), bolt.p[b][i][1] = (int16_t)clamp(y, 0, 239);
         }
-        bolt.p[b][np][0] = (int16_t)tx, bolt.p[b][np++][1] = (int16_t)ty;
-        bolt.np[b] = (uint8_t)np;
+        bolt.np[b] = (uint8_t)(steps + 1);
     }
+}
+
+/* the pads: the same idea on the 2 x 8 grid: a bolt walks from one end to the other, pad by pad, now on along the
+ * row, now across, now both, with a branch here and there; each pad struck flashes white, then glows yellow away */
+#define PB_N 3u
+#define PB_MS 180u                                 /* a bolt's run across */
+#define PH_MS 420u                                 /* a pad's glow after the strike */
+static struct { uint32_t t; uint8_t n, done, p[28]; } pb[PB_N];
+static uint32_t pheat[16];                         /* each pad struck at (ms | 1) */
+static uint32_t pad_at(int32_t col, uint32_t row) { return (row ? 8u : 0u) + (uint32_t)col; }   /* row 1: bottom */
+static void pad_bolt(int left, uint32_t row, int up)   /* from the left (or right) end, row; up: end on the top row */
+{
+    uint32_t s, o = 0, n = 0;
+    int32_t col = left ? 0 : 7, dir = left ? 1 : -1, end = left ? 7 : 0;
+    for (s = 1; s < PB_N; s++)                     /* (the oldest slot) */
+        if (!pb[s].t || (pb[o].t && since(pb[s].t) > since(pb[o].t)))
+            o = s;
+    pb[o].p[n++] = (uint8_t)pad_at(col, row);
+    while (n < sizeof pb[o].p - 2u && col != end) {
+        uint32_t r = rnd() % 100u;
+        if (r < 22u)
+            row ^= 1u;                             /* across */
+        else {
+            col += dir;                            /* on, sometimes across too */
+            if (r < 48u)
+                row ^= 1u;
+        }
+        pb[o].p[n++] = (uint8_t)pad_at(col, row);
+        if (rnd() % 100u < 18u)
+            pb[o].p[n++] = (uint8_t)pad_at(col, row ^ 1u);   /* a branch */
+    }
+    if (up && row)
+        pb[o].p[n++] = (uint8_t)pad_at(end, 0u);
+    pb[o].n = (uint8_t)n;
+    pb[o].done = 0;
+    pb[o].t = fm1_ms | 1u;
 }
 
 /* ------------------------------------------------------------- the game --- */
@@ -293,8 +348,9 @@ static void game_start(void)
     ui.intro_n = ui.unlocked;                      /* the first notes shown, one by one */
     ui.phase = (uint8_t)phase_first();
     ui.last = 0xFF;
-    ui.start_t = fm1_ms | 1u;
     bolt.t = 0;
+    pad_bolt(1, 1u, 0);                            /* (the start: two bolts across the pads) */
+    pad_bolt(1, 0u, 0);
     intro(NR_START_MS);
 }
 static void next(void)                             /* after a right answer */
@@ -320,8 +376,8 @@ static void hit(void)
     ui.gain = PHASE_BONUS[ui.phase];
     ui.combo = (uint16_t)(ui.combo + ui.gain);
     ui.streak++;
-    ui.flash_t = fm1_ms | 1u;
     lightning(fm1_ms - ui.ask_t);
+    pad_bolt(1, 1u, 1);                            /* bottom left to top right, as on the screen */
     enter(GS_OK);
 }
 static void miss(uint32_t why, uint32_t played)
@@ -342,16 +398,10 @@ static int answer_ok(uint32_t n)
     uint32_t t = note_midi(ui.cur);
     return ui.phase == PH_PAUTA ? n == t : n % 12u == t % 12u;
 }
-static int starts(void)                            /* a key now starts a game (and stays silent) */
-{
-    return ui.gs == GS_TITLE || (ui.gs == GS_BOARD && fm1_ms - ui.t0 >= NR_BOARD_LOCK_MS);
-}
 static void game_key(uint32_t n)                   /* a key pressed (the keybed, or USB MIDI), MIDI note n */
 {
     ui.rnd ^= fm1_ms;
-    if (starts())
-        game_start();
-    else if (ui.gs == GS_ASK) {
+    if (ui.gs == GS_ASK) {
         if (answer_ok(n))
             hit();
         else
@@ -376,7 +426,7 @@ static void game_tick(void)
     }
     if (ui.msg[0] && (int32_t)(now - ui.msg_until) >= 0) {
         ui.msg[0] = 0;
-        ui.dirty = 1;
+        ui.redraw |= D_HEAD | D_FOOT;
     }
     {                                              /* the ball lightning: the combo in play, the score being named */
         static uint32_t ball;
@@ -488,7 +538,7 @@ static void pads_poll(void)
         if ((uint32_t)e & 255u)
             replay();
 }
-static void keys_poll(void)
+static void keys_poll(void)                        /* the keys always play; asked, they answer */
 {
     uint64_t now = fm1_in.keys, ch = now ^ ui.keys;
     uint32_t k;
@@ -498,21 +548,13 @@ static void keys_poll(void)
     for (k = 0; ch && k < 37u; k++)
         if ((ch >> k) & 1u) {
             uint32_t n = (uint32_t)(NR_KEY0 + (int32_t)k), vel = fm1_in.key_vel[k];
-            uint64_t bit = (uint64_t)1u << k;
             vel = vel ? (vel > 127u ? 127u : vel) : 100u;
-            if (now & bit) {
-                if (starts() || ui.gs == GS_SETUP || ui.gs == GS_NAME) {
-                    ui.quiet |= bit;               /* (a key that starts, or in a menu: silent) */
-                    game_key(n);
-                    continue;
-                }
+            if ((now >> k) & 1u) {
                 if (ui.tone_off && ui.gs != GS_INTRO)
                     tone_stop();                   /* (the player's key over the heard note) */
                 ev_push(EV_ON, n, vel);
                 game_key(n);
-            } else if (ui.quiet & bit)
-                ui.quiet &= ~bit;
-            else
+            } else
                 ev_push(EV_OFF, n, 0);
         }
 }
@@ -549,7 +591,7 @@ static void buttons_poll(void)
             else if (ui.gs == GS_TITLE && (b == B_LEFT || b == B_RIGHT))
                 mode_step(b == B_LEFT ? -1 : 1);
             else if (b == B_PLAY) {
-                if (starts())
+                if (ui.gs == GS_TITLE || ui.gs == GS_BOARD)
                     game_start();
                 else
                     replay();
@@ -558,7 +600,7 @@ static void buttons_poll(void)
         }
     }
 }
-static void knobs_poll(void)
+static void knobs_poll(void)                       /* the settings: K1..K4 its rows; else the sound */
 {
     uint32_t k;
     int32_t s;
@@ -566,15 +608,74 @@ static void knobs_poll(void)
         if ((s = fm1_enc_take(k)) == 0)
             continue;
         if (ui.gs == GS_SETUP && k < SET_N)
-            setup_turn(k, s);                      /* (K1..K4: the rows) */
-        else if (ui.gs == GS_NAME && k == 0u)
-            name_letter(s);
-        else if (ui.gs == GS_TITLE && k == 0u)
-            mode_step(s);
+            setup_turn(k, s);
+        else
+            sctl_set(&KNOB[k], s * 2, 1);
     }
 }
+static void faders_poll(void)                      /* VOLUME, REVERB, DELAY, CHORUS: a fader moved sets its value */
+{
+    uint32_t i;
+    if (fm1_in.frames < 300u)
+        return;
+    for (i = 0; i < 4u; i++) {
+        int32_t v = fm1_in.fader[i], d = v - ui.fad[i];
+        if (!ui.fad_ready)
+            ui.fad[i] = (uint8_t)v;                /* (where they are at the start: the sound's own values stay) */
+        else if (d > 1 || d < -1 || (d && (v == 0 || v == 127))) {
+            ui.fad[i] = (uint8_t)v;
+            sctl_set(&FADER[i], v, 0);
+        }
+    }
+    ui.fad_ready = 1;
+}
+/* the wheels (as Vector37's ui.c reads them): pitch a bend (its centre where it rests); mod the vibrato's depth (up to
+ * 40 cents at 5.5 Hz, a triangle), both through the engine's bend */
+static void wheels_poll(void)
+{
+    enum { DEAD = 12, SPAN0 = 80, MOD_LO = 485, MOD_HI = 615 };
+    static int32_t pc, plo, phi, mlo, mhi, rest, mf, shown = -1;
+    int32_t p = fm1_in.wheel[0], m = fm1_in.wheel[1], d, x;
+    uint32_t ph;
+    if (fm1_in.frames < 300u)
+        return;
+    if (!pc) {
+        pc = p, plo = p - SPAN0, phi = p + SPAN0;
+        mlo = m < MOD_LO ? m : MOD_LO, mhi = m > MOD_HI ? m : MOD_HI;
+    }
+    plo = p < plo ? p : plo, phi = p > phi ? p : phi;
+    mlo = m < mlo ? m : mlo, mhi = m > mhi ? m : mhi;
+    d = p - pc;
+    if (d > -DEAD && d < DEAD) {
+        x = 0;
+        if (++rest > 200) {
+            pc += d > 0 ? 1 : d < 0 ? -1 : 0;
+            rest = 0;
+        }
+    } else {
+        rest = 0;
+        x = d > 0 ? (d - DEAD) * 32767 / (phi - pc - DEAD > 1 ? phi - pc - DEAD : 1)
+                  : (d + DEAD) * 32767 / (pc - plo - DEAD > 1 ? pc - plo - DEAD : 1);
+    }
+    ui.bend = clamp(x, -32767, 32767);
+    x = mhi - m <= DEAD ? 0 : clamp((mhi - m - DEAD) * 32767 / (mhi - mlo - DEAD > 1 ? mhi - mlo - DEAD : 1), 0, 32767);
+    mf += (x * 8 - mf) >> 3;                       /* (smoothed: the reading is noisy) */
+    ui.vib = (mf + 4) >> 3;
+    x = ui.vib * 100 / 32767;
+    if (x != shown && (x - shown > 2 || shown - x > 2 || x == 0)) {
+        if (shown >= 0) {
+            char b[6];
+            b[0] = (char)('0' + x / 100), b[1] = (char)('0' + x / 10 % 10), b[2] = (char)('0' + x % 10), b[3] = '%', b[4] = 0;
+            ui_say("VIBRATO ", x >= 100 ? b : x >= 10 ? b + 1 : b + 2);
+        }
+        shown = x;
+    }
+    ph = (fm1_ms * 5632u / 1000u) & 1023u;         /* 5.5 Hz */
+    x = ph < 512u ? (int32_t)ph * 128 - 32768 : (int32_t)(1023u - ph) * 128 - 32768;
+    joy_x = clamp(ui.bend + ((ui.vib * 2 / (5 * pt.g[G_BEND])) * x >> 15), -32767, 32767);
+}
 
-/* USB MIDI in: a MIDI keyboard answers as the keys do (any channel, or the one set) */
+/* USB MIDI in: a MIDI keyboard plays and answers as the keys do (any channel, or the one set) */
 static void midi_poll(void)
 {
     while (mi_r != mi_w) {
@@ -587,10 +688,8 @@ static void midi_poll(void)
         if (settings.midi_in && cin >= 8u && cin <= 14u && ((pkt >> 8) & 15u) != settings.midi_in - 1u)
             continue;
         if (cin == 9u && d2) {
-            if (!starts()) {
-                tone_stop();
-                ev_push(EV_ON, d1, d2);
-            }
+            tone_stop();
+            ev_push(EV_ON, d1, d2);
             game_key(d1);
         } else if (cin == 8u || cin == 9u)
             ev_push(EV_OFF, d1, 0);
@@ -600,11 +699,11 @@ static void midi_poll(void)
 }
 
 /* ------------------------------------------------------------- LEDs --- */
-/* the identity's colours: yellow on blue. The combo meter column by column from the bottom left (each 16 a lap:
- * yellow on blue, then white on yellow); a right answer flashes green then flickers with the lightning; the start
- * sweeps yellow left to right; game over red; the title and the menus breathe blue with a yellow column */
-static const uint8_t C_YEL_LED[3] = {255, 230, 40}, C_BLU_LED[3] = {20, 50, 255}, C_VIO_LED[3] = {50, 0, 210};
-static const uint8_t C_OK_LED[3] = {0, 255, 110}, C_ERR_LED[3] = {255, 20, 50}, C_WHT_LED[3] = {255, 255, 255};
+/* the identity's colours: yellow on blue. Under it all: in play the combo meter (column by column from the bottom
+ * left, each 16 a lap: yellow on blue, then white on yellow), game over red, the menus a slow blue breath; over it the
+ * pads' lightning (pad_bolt): a right answer, the start, and in the menus now and then on its own */
+static const uint8_t C_YEL_LED[3] = {255, 230, 40}, C_BLU_LED[3] = {20, 50, 255};
+static const uint8_t C_ERR_LED[3] = {255, 20, 50}, C_WHT_LED[3] = {255, 255, 255};
 static void pad_col(uint32_t pad, const uint8_t *c, uint32_t k)   /* k of 256 */
 {
     uint32_t sc = (4u + settings.bright * 12u) * k >> 8;
@@ -612,29 +711,34 @@ static void pad_col(uint32_t pad, const uint8_t *c, uint32_t k)   /* k of 256 */
 }
 static void ui_leds(void)
 {
+    static uint32_t idle_next;
     uint32_t i, now = fm1_ms, fl = ui.flash_t ? since(ui.flash_t) : 1000000u;
-    uint32_t st = ui.start_t ? since(ui.start_t) : 1000000u;
+    int menu = ui.gs == GS_TITLE || ui.gs >= GS_NAME;
+    if (menu && (int32_t)(now - idle_next) >= 0) { /* (the menus: a bolt now and then, either way, either row) */
+        pad_bolt((int)(rnd() & 1u), rnd() & 1u, 0);
+        idle_next = now + 500u + rnd() % 1100u;
+    }
+    for (i = 0; i < PB_N; i++)                     /* the bolts on their way: their pads struck as they get there */
+        if (pb[i].t) {
+            uint32_t r = pb[i].n * since(pb[i].t) / PB_MS + 1u;
+            for (r = r > pb[i].n ? pb[i].n : r; pb[i].done < r; pb[i].done++)
+                pheat[pb[i].p[pb[i].done] & 15u] = now | 1u;
+            if (pb[i].done >= pb[i].n)
+                pb[i].t = 0;
+        }
     for (i = 0; i < 16u; i++) {
-        uint32_t pad = (i & 1u ? 0u : 8u) + i / 2u, col = pad & 7u;   /* (i: the meter's order) */
-        if (st < 560u) {                           /* the start: a yellow sweep */
-            int32_t d = (int32_t)(st / 60u) - (int32_t)col;
-            if (d >= 0 && d < 3)
-                pad_col(pad, d ? C_BLU_LED : C_YEL_LED, d == 2 ? 120u : 256u);
-            else
-                pad_col(pad, C_VIO_LED, 30u);
-        } else if (ui.gs == GS_OVER)
+        uint32_t pad = (i & 1u ? 0u : 8u) + i / 2u;   /* (i: the meter's order) */
+        uint32_t age = pheat[pad] ? since(pheat[pad]) : PH_MS;
+        if (age < 70u)                             /* struck: white, flickering */
+            pad_col(pad, (rnd() & 3u) ? C_WHT_LED : C_YEL_LED, 256u);
+        else if (age < PH_MS)                      /* its glow */
+            pad_col(pad, C_YEL_LED, 256u - (age - 70u) * 216u / (PH_MS - 70u));
+        else if (ui.gs == GS_OVER)
             pad_col(pad, C_ERR_LED, fl < 500u ? 256u : (now / 300u) & 1u ? 110u : 40u);
-        else if (ui.gs == GS_TITLE || ui.gs >= GS_NAME) {
-            uint32_t ph = (now / 6u) & 255u, br = ph < 128u ? 40u + ph : 40u + (255u - ph);
-            if (col == (now / 180u) % 8u)
-                pad_col(pad, C_YEL_LED, 220u);
-            else
-                pad_col(pad, C_BLU_LED, br);
-        } else if (fl < 120u)
-            pad_col(pad, C_OK_LED, 256u);
-        else if (bolt.t && since(bolt.t) < NR_OK_MS)
-            pad_col(pad, (rnd() & 3u) ? C_YEL_LED : C_WHT_LED, 120u + (rnd() & 127u));
-        else {
+        else if (menu) {
+            uint32_t ph = (now / 8u) & 255u;
+            pad_col(pad, C_BLU_LED, ph < 128u ? 30u + ph / 2u : 30u + (255u - ph) / 2u);
+        } else {
             uint32_t lit = ui.combo % 16u, lap = (ui.combo / 16u) & 1u;
             if (i < lit)
                 pad_col(pad, lap ? C_WHT_LED : C_YEL_LED, 256u);
@@ -666,5 +770,7 @@ static void ui_input(void)
     keys_poll();
     buttons_poll();
     knobs_poll();
+    faders_poll();
+    wheels_poll();
     game_tick();
 }

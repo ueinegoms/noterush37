@@ -22,7 +22,7 @@ static const uint16_t STRIP_Y[6] = {0, 34, 42, 122, 202, 240};
 #define CARD_W 228
 #define CARD_H 194
 static int32_t strip_y0, strip_y1;
-static void ball(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint32_t n, int32_t y0, int32_t y1);
+static void sbolts(uint32_t strip);
 
 static void text_b(int32_t x, int32_t y, const felucca_font_t *f, const char *s, uint16_t c)   /* bold, as the web */
 {
@@ -166,13 +166,10 @@ static void note_label(char *b, uint32_t midi, int octave)   /* "A", "A4", "Eb4"
 static void header(void)
 {
     char b[12];
+    sbolts(D_HEAD);                                /* (a combo running: its lightning, under the words) */
     text_b(8, 10, &FONT_S, ui.msg[0] ? ui.msg : "NOTE RUSH", ui.msg[0] ? C_YEL : C_WHITE);   /* (or a knob's value) */
     b[0] = 'x';
     num(b + 1, ui.combo);
-    if (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK) {   /* a combo running: its ball lightning */
-        int32_t w = text_w(&FONT_L, b);
-        ball(232 - w / 2, 17, w / 2 + 10, 16, 2u + (ui.combo / 8u > 4u ? 4u : ui.combo / 8u), 1, 32);
-    }
     text_r(232, 1, &FONT_L, b, C_YEL);
 }
 static void clock_bar(void)                        /* as the web's: shown only while a question's time runs */
@@ -250,10 +247,7 @@ static void card_name(void)
 {
     static const char *const LBL[4] = {"OCT+", "OCT-", "<", ">"};
     uint32_t i;
-    char b[12];
-    b[0] = 'x';
-    num(b + 1, ui.combo);
-    ball(120, CARD_Y + 32, text_w(&FONT_XL, b) / 2 + 22, 28, 7, CARD_Y + 2, 100);
+    sbolts(D_MID);                                 /* (the score's lightning, under it) */
     score_big();
     for (i = 0; i < 3u; i++) {                     /* the letters: the one being set plain, the others boxed */
         char s[2] = {ui.name[i], 0};
@@ -358,35 +352,24 @@ static void bolts(void)                            /* the lightning over everyth
             cv_line(bolt.p[b][i - 1u][0], bolt.p[b][i - 1u][1], bolt.p[b][i][0], bolt.p[b][i][1], C_YEL);
     }
 }
-/* ball lightning (as Path of Exile's, its bolts only): n jagged bolts out from the middle of a number, a new set every
- * BALL_MS; the same set in every strip (its own random, seeded by the time), kept within rows y0 .. y1 */
-static const int8_t DIR16[16][2] = {{64, 0}, {59, 24}, {45, 45}, {24, 59}, {0, 64}, {-24, 59}, {-45, 45}, {-59, 24},
-                                    {-64, 0}, {-59, -24}, {-45, -45}, {-24, -59}, {0, -64}, {24, -59}, {45, -45}, {59, -24}};
-static uint32_t ball_r;
-static uint32_t br(void)
-{
-    ball_r ^= ball_r << 13;
-    ball_r ^= ball_r >> 17;
-    ball_r ^= ball_r << 5;
-    return ball_r;
-}
-static void ball(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint32_t n, int32_t y0, int32_t y1)
-{
-    uint32_t i, k;
-    ball_r = (fm1_ms / BALL_MS) * 2654435761u | 1u;
-    for (i = 0; i < n; i++) {
-        const int8_t *d = DIR16[br() % 16u];
-        int32_t f = 52 + (int32_t)(br() % 24u);    /* (its reach: 0.8 .. 1.2 of the radius) */
-        int32_t ex = cx + d[0] * rx * f / 4096, ey = cy + d[1] * ry * f / 4096;
-        int32_t px = cx + (int32_t)(br() % 7u) - 3, py = cy + (int32_t)(br() % 5u) - 2, sx = px, sy = py;
-        for (k = 1; k <= 4u; k++) {                /* four pieces, each bent off the straight way */
-            int32_t qx = sx + (ex - sx) * (int32_t)k / 4, qy = sy + (ey - sy) * (int32_t)k / 4;
-            if (k < 4u)
-                qx += (int32_t)(br() % 9u) - 4, qy += (int32_t)(br() % 7u) - 3;
-            qy = clamp(qy, y0, y1);
-            cv_line(px, py, qx, qy, C_YEL);
-            px = qx, py = qy;
-        }
+static void sbolts(uint32_t strip)                 /* the band bolts of a strip (game.c: band_bolt): they run */
+{                                                  /* out to the right edge, then draw back into it */
+    uint32_t i, k, b;
+    for (i = 0; i < SB_N; i++) {
+        uint32_t t, n, i0;
+        if (!sb[i].t || sb[i].strip != strip)
+            continue;
+        t = since(sb[i].t);
+        n = t >= SB_RUN ? sb[i].n : (sb[i].n * t + SB_RUN - 1u) / SB_RUN;
+        i0 = t <= SB_LIFE - 130u ? 0u : (sb[i].n - 1u) * (t - (SB_LIFE - 130u)) / 130u;
+        for (k = i0 + 1u; k < n; k++)
+            cv_line(sb[i].p[k - 1u][0], sb[i].p[k - 1u][1], sb[i].p[k][0], sb[i].p[k][1], C_YEL);
+        for (b = 0; b < sb[i].nb; b++)
+            if (sb[i].at[b] < n && sb[i].at[b] >= i0) {
+                const int16_t *a = sb[i].p[sb[i].at[b]];
+                cv_line(a[0], a[1], sb[i].b[b][0][0], sb[i].b[b][0][1], C_YEL);
+                cv_line(sb[i].b[b][0][0], sb[i].b[b][0][1], sb[i].b[b][1][0], sb[i].b[b][1][1], C_YEL);
+            }
     }
 }
 static void scene(void)

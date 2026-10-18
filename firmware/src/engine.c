@@ -511,7 +511,10 @@ static void note_on(uint32_t note, uint32_t vel)
     {   /* POLY / DUAL: a free voice (pair), else the oldest (released ones first) */
         uint32_t step = mode == PM_DUAL ? 2u : 1u, best = 0, bage = 0xFFFFFFFFu, b;
         int found = 0;
-        for (i = 0; i + step <= lim; i += step) {
+        for (i = 0; i + step <= lim && !found; i += step)   /* NOTE RUSH 37: the same note again strikes its own */
+            if (vs[i].stage && vs[i].note == note)          /* voice (a string struck again): no second copy of */
+                best = i, found = 1;                        /* it, out of phase with the first, beating against it */
+        for (i = 0; i + step <= lim && !found; i += step) {
             uint32_t age = vs[i].age - (vs[i].on ? 0u : 0x40000000u);
             if (!vs[i].stage && (step == 1u || !vs[i + 1u].stage)) {
                 best = i, found = 1;

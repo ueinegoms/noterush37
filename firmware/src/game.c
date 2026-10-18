@@ -73,7 +73,6 @@ static struct { uint32_t magic; lb_ent_t e[NR_LB]; } lb;
 #define D_HEAD 1u                                  /* the screen's strips (gdraw.c) */
 #define D_BAR 2u
 #define D_MID 4u                                   /* (the card's upper half) */
-#define BALL_MS 70u                                /* the ball lightning round the combo: a new set this often */
 #define D_BODY 12u
 #define D_FOOT 16u
 #define D_ALL 31u
@@ -134,6 +133,11 @@ static uint32_t phase_first(void) { return ui.mode == MODE_ALL ? PH_NOME : ui.mo
 static uint32_t new_note(void) { return ORDER[ui.unlocked - ui.intro_n]; }   /* (the intro's note) */
 
 /* ------------------------------------------------------------- sound --- */
+static void note_play(uint32_t n, uint32_t vel)    /* a note on, the same each time: the chorus's sweep starts anew */
+{                                                  /* (its free-running LFO made each strike louder or softer) */
+    chs.ph = 0;
+    ev_push(EV_ON, n, vel);
+}
 static void tone_stop(void)
 {
     if (ui.tone_off) {
@@ -146,7 +150,7 @@ static void tone(uint32_t n)                       /* a note played for the play
 {
     tone_stop();
     ui.tone_note = (uint8_t)n;
-    ev_push(EV_ON, n, 100);
+    note_play(n, 100);
     ui.tone_off = (fm1_ms + NR_TONE_MS) | 1u;
     ui.redraw |= D_BODY;
 }
@@ -161,6 +165,10 @@ static void preset_load(uint32_t n)                /* the sound: factory sound n
     preset_make(n % NFACT, &pt);
     if (pt.g[G_BEND] < 2)
         pt.g[G_BEND] = 2;                          /* (the wheels need a range: 2 semitones) */
+    pt.g[G_RETRIG] = 1;                            /* the same key, the same sound: each note starts its orbit anew */
+    pt.g[G_SPIN] = 0;                              /* (and the path does not turn on with the time) */
+    if (pt.g[G_POLY] == PM_POLY)                   /* (Vector37's), no random place in the stereo, no random drift */
+        pt.g[G_STEREO] = 0, pt.g[G_DETUNE] = 0;
 }
 static void sctl_say(const sctl_t *c)
 {
@@ -277,13 +285,14 @@ static void lightning(uint32_t react_ms)
 
 /* the pads: the same idea on the 2 x 8 grid: a bolt walks from one end to the other, pad by pad, now on along the
  * row, now across, now both, with a branch here and there; each pad struck flashes white, then glows yellow away */
-#define PB_N 3u
+#define PB_N 4u
 #define PB_MS 180u                                 /* a bolt's run across */
 #define PH_MS 420u                                 /* a pad's glow after the strike */
 static struct { uint32_t t; uint8_t n, done, p[28]; } pb[PB_N];
 static uint32_t pheat[16];                         /* each pad struck at (ms | 1) */
 static uint32_t pad_at(int32_t col, uint32_t row) { return (row ? 8u : 0u) + (uint32_t)col; }   /* row 1: bottom */
-static void pad_bolt(int left, uint32_t row, int up)   /* from the left (or right) end, row; up: end on the top row */
+static void pad_bolt(int left, uint32_t row, int up, uint32_t delay)   /* from the left (or right) end, row; up: end
+                                                                          on the top row; delay: its start, ms on */
 {
     uint32_t s, o = 0, n = 0;
     int32_t col = left ? 0 : 7, dir = left ? 1 : -1, end = left ? 7 : 0;
@@ -308,7 +317,43 @@ static void pad_bolt(int left, uint32_t row, int up)   /* from the left (or righ
         pb[o].p[n++] = (uint8_t)pad_at(end, 0u);
     pb[o].n = (uint8_t)n;
     pb[o].done = 0;
-    pb[o].t = fm1_ms | 1u;
+    pb[o].t = (fm1_ms + delay) | 1u;
+}
+
+/* the screen's bands (the pads go on from the screen's right edge, as on the keyboard): a bolt runs a band of the
+ * screen from left to right (the header while a combo runs, the score while it is named), jagged, a branch here and
+ * there; out at the right edge it goes on across the pads */
+#define SB_N 3u
+#define SB_PTS 24u
+#define SB_RUN 130u                                /* its run across the band */
+#define SB_LIFE 300u                               /* ... then it draws back into the right edge */
+static struct { uint32_t t; uint8_t n, nb, strip; uint8_t at[4]; int16_t p[SB_PTS][2], b[4][2][2]; } sb[SB_N];
+static void band_bolt(int32_t y0, int32_t y1, uint32_t strip)
+{
+    uint32_t s, o = 0, n = 0;
+    int32_t x = 0, y = y0 + (int32_t)(rnd() % (uint32_t)(y1 - y0 + 1));
+    for (s = 1; s < SB_N; s++)
+        if (!sb[s].t || (sb[o].t && since(sb[s].t) > since(sb[o].t)))
+            o = s;
+    sb[o].nb = 0;
+    sb[o].p[n][0] = (int16_t)x, sb[o].p[n++][1] = (int16_t)y;
+    while (x < 239 && n < SB_PTS) {
+        x += 8 + (int32_t)(rnd() % 13u);
+        x = x > 239 ? 239 : x;
+        y = clamp(y + (int32_t)(rnd() % 21u) - 10, y0, y1);
+        sb[o].p[n][0] = (int16_t)x, sb[o].p[n++][1] = (int16_t)y;
+        if (sb[o].nb < 4u && rnd() % 100u < 25u) { /* a branch: two pieces off, up or down */
+            int32_t d = rnd() & 1u ? 1 : -1, k;
+            for (k = 0; k < 2; k++)
+                sb[o].b[sb[o].nb][k][0] = (int16_t)(x + 4 + k * 5 + (int32_t)(rnd() % 4u)),
+                sb[o].b[sb[o].nb][k][1] = (int16_t)clamp(y + d * (5 + k * 6 + (int32_t)(rnd() % 4u)), y0, y1);
+            sb[o].at[sb[o].nb++] = (uint8_t)(n - 1u);
+        }
+    }
+    sb[o].n = (uint8_t)n;
+    sb[o].strip = (uint8_t)strip;
+    sb[o].t = fm1_ms | 1u;
+    pad_bolt(1, (uint32_t)(y - y0) * 2u > (uint32_t)(y1 - y0) ? 1u : 0u, 0, SB_RUN);   /* (on, from its height) */
 }
 
 /* ------------------------------------------------------------- the game --- */
@@ -349,8 +394,8 @@ static void game_start(void)
     ui.phase = (uint8_t)phase_first();
     ui.last = 0xFF;
     bolt.t = 0;
-    pad_bolt(1, 1u, 0);                            /* (the start: two bolts across the pads) */
-    pad_bolt(1, 0u, 0);
+    pad_bolt(1, 1u, 0, 0);                         /* (the start: two bolts across the pads) */
+    pad_bolt(1, 0u, 0, 0);
     intro(NR_START_MS);
 }
 static void next(void)                             /* after a right answer */
@@ -377,7 +422,7 @@ static void hit(void)
     ui.combo = (uint16_t)(ui.combo + ui.gain);
     ui.streak++;
     lightning(fm1_ms - ui.ask_t);
-    pad_bolt(1, 1u, 1);                            /* bottom left to top right, as on the screen */
+    pad_bolt(1, 0u, 0, 200);                       /* at the combo (the screen's top right): on, across the pads */
     enter(GS_OK);
 }
 static void miss(uint32_t why, uint32_t played)
@@ -428,15 +473,24 @@ static void game_tick(void)
         ui.msg[0] = 0;
         ui.redraw |= D_HEAD | D_FOOT;
     }
-    {                                              /* the ball lightning: the combo in play, the score being named */
-        static uint32_t ball;
-        if (now / BALL_MS != ball) {
-            ball = now / BALL_MS;
-            if (ui.gs == GS_NAME)
-                ui.redraw |= D_MID;
-            else if (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK)
-                ui.redraw |= D_HEAD;
-        }
+    {                                              /* the bands' lightning: the score being named, the combo */
+        static uint32_t due;                       /* running (more often the higher), on into the pads */
+        uint32_t i;
+        if (ui.gs == GS_NAME || (ui.combo && ui.gs >= GS_INTRO && ui.gs <= GS_OK)) {
+            if ((int32_t)(now - due) >= 0) {
+                if (ui.gs == GS_NAME)
+                    band_bolt(48, 102, D_MID), due = now + 260u + rnd() % 300u;
+                else
+                    band_bolt(3, 30, D_HEAD), due = now + 1500u - (ui.combo > 60u ? 60u : ui.combo) * 20u + rnd() % 200u;
+            }
+        } else
+            due = now + 300u;
+        for (i = 0; i < SB_N; i++)
+            if (sb[i].t) {
+                ui.redraw |= sb[i].strip;          /* (on screen: drawn every frame, and once more when gone) */
+                if (since(sb[i].t) >= SB_LIFE)
+                    sb[i].t = 0;
+            }
     }
     if (bolt.t && since(bolt.t) >= NR_OK_MS) {
         bolt.t = 0;
@@ -552,7 +606,7 @@ static void keys_poll(void)                        /* the keys always play; aske
             if ((now >> k) & 1u) {
                 if (ui.tone_off && ui.gs != GS_INTRO)
                     tone_stop();                   /* (the player's key over the heard note) */
-                ev_push(EV_ON, n, vel);
+                note_play(n, vel);
                 game_key(n);
             } else
                 ev_push(EV_OFF, n, 0);
@@ -689,7 +743,7 @@ static void midi_poll(void)
             continue;
         if (cin == 9u && d2) {
             tone_stop();
-            ev_push(EV_ON, d1, d2);
+            note_play(d1, d2);
             game_key(d1);
         } else if (cin == 8u || cin == 9u)
             ev_push(EV_OFF, d1, 0);
@@ -714,12 +768,12 @@ static void ui_leds(void)
     static uint32_t idle_next;
     uint32_t i, now = fm1_ms, fl = ui.flash_t ? since(ui.flash_t) : 1000000u;
     int menu = ui.gs == GS_TITLE || ui.gs >= GS_NAME;
-    if (menu && (int32_t)(now - idle_next) >= 0) { /* (the menus: a bolt now and then, either way, either row) */
-        pad_bolt((int)(rnd() & 1u), rnd() & 1u, 0);
+    if (menu && ui.gs != GS_NAME && (int32_t)(now - idle_next) >= 0) {   /* (the name: the screen feeds them) */ /* (the menus: a bolt now and then, either way, either row) */
+        pad_bolt((int)(rnd() & 1u), rnd() & 1u, 0, 0);
         idle_next = now + 500u + rnd() % 1100u;
     }
     for (i = 0; i < PB_N; i++)                     /* the bolts on their way: their pads struck as they get there */
-        if (pb[i].t) {
+        if (pb[i].t && (int32_t)(now - pb[i].t) >= 0) {
             uint32_t r = pb[i].n * since(pb[i].t) / PB_MS + 1u;
             for (r = r > pb[i].n ? pb[i].n : r; pb[i].done < r; pb[i].done++)
                 pheat[pb[i].p[pb[i].done] & 15u] = now | 1u;

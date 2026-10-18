@@ -34,6 +34,31 @@ static int target_key(void) { return (int)note_midi(ui.cur) - NR_KEY0; }
 static void wait_gs(int gs) { int i; for (i = 0; i < 600 && ui.gs != gs; i++) panel_ms(20); }
 static void answer(void) { wait_gs(GS_ASK); key(target_key()); }
 
+/* the same key, the same velocity: each strike's first 0.3 s (left, right: RMS) */
+#ifndef GAP_MS
+#define GAP_MS 2500                                /* (the reverb's tail gone, mostly) */
+#endif
+static void strikes(double *spread_l, double *spread_bal)
+{
+    static float l[13230], r[13230];
+    double lo = 1e9, hi = 0, blo = 1e9, bhi = -1e9;
+    int n, i;
+    for (n = 0; n < 6; n++) {
+        double el = 0, er = 0;
+        panel_ms(GAP_MS + 137 * n);                /* (irregular gaps: the orbit runs on between them) */
+        panel_key(24, 1, 100);
+        panel_render(l, r, 13230);
+        panel_key(24, 0, 0);
+        for (i = 0; i < 13230; i++)
+            el += l[i] * l[i], er += r[i] * r[i];
+        el = el / 13230, er = er / 13230;
+        lo = el + er < lo ? el + er : lo, hi = el + er > hi ? el + er : hi;
+        blo = el / (el + er) < blo ? el / (el + er) : blo, bhi = el / (el + er) > bhi ? el / (el + er) : bhi;
+    }
+    panel_ms(1500);
+    *spread_l = hi / lo, *spread_bal = bhi - blo;
+}
+
 int main(void)
 {
     int i;
@@ -45,6 +70,18 @@ int main(void)
     CHECK(ui.mode == MODE_NOME, "> picks the next mode (%d)", ui.mode);
     btn(B_LEFT);
     CHECK(ui.mode == MODE_ALL, "< back");
+
+    {                                              /* the same key: the same sound, every sound */
+        double lv, bal;
+        uint32_t k;
+        for (k = 0; k < NSND; k++) {
+            preset_load(SND[k]);
+            strikes(&lv, &bal);
+            CHECK(lv < 1.4 && bal < 0.08,   /* (FLAUTA, CORDAS: their breath, their bow: noise) */
+                  "%s: the same key, the same level (x%.3f) and place (%.3f)", SND_NAME[k], lv, bal);
+        }
+        preset_load(SND[0]);
+    }
 
     /* the settings */
     btn(B_GLOBE);

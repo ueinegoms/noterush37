@@ -82,6 +82,17 @@ static int16_t base_cut[NC];                       /* the sound's own corner cut
 static const int8_t DIR16[16][2] = {{64, 0}, {59, 24}, {45, 45}, {24, 59}, {0, 64}, {-24, 59}, {-45, 45}, {-59, 24},
                                     {-64, 0}, {-59, -24}, {-45, -45}, {-24, -59}, {0, -64}, {24, -59}, {45, -45}, {59, -24}};
 
+/* the rack: what was set on the PATCH screen and with the faders, kept from sound to sound (and in flash); a knob or
+ * a fader never touched: each sound's own. BRILHO and RESSONANCIA as a change from the sound's own (each sound starts
+ * elsewhere), the others as values */
+#define RACK_OBJ (OBJ_SCENE0 + 3u)
+#define RACK_MAGIC 0x4E525231u                     /* "NRR1" */
+#define RACK_UNSET (-128)
+typedef struct { uint32_t magic; int8_t k[8], f[4]; } rack_t;
+static rack_t rack;
+static uint8_t rack_dirty;
+static patch_t factory;                            /* the sound as it comes */
+
 /* the ranking: a store object of its own (storage.c; scenes.c's sounds: OBJ_SCENE0) */
 #define LB_OBJ (OBJ_SCENE0 + 1u)
 #define LB_MAGIC 0x4E524C31u                       /* "NRL1" */
@@ -189,11 +200,38 @@ static void preset_load(uint32_t n)                /* the sound: factory sound n
     pt.g[G_SPIN] = 0;                              /* (and the path does not turn on with the time) */
     if (pt.g[G_POLY] == PM_POLY)                   /* (Vector37's), no random place in the stereo, no random drift */
         pt.g[G_STEREO] = 0, pt.g[G_DETUNE] = 0;
-    {
-        uint32_t c;
+    factory = pt;
+    {                                              /* the rack on it */
+        uint32_t i, c;
+        for (i = 0; i < 8u; i++) {
+            const sctl_t *k = &KNOB[i];
+            if (rack.k[i] == RACK_UNSET)
+                continue;
+            if (k->corner)
+                for (c = 0; c < NC; c++)
+                    pt.c[c][k->id] = (int16_t)clamp(factory.c[c][k->id] + rack.k[i], CDESC[k->id].min, CDESC[k->id].max);
+            else
+                pt.g[k->id] = (int16_t)clamp(rack.k[i], GDESC[k->id].min, GDESC[k->id].max);
+        }
+        for (i = 0; i < 4u; i++)
+            if (rack.f[i] != RACK_UNSET)
+                pt.g[FADER[i].id] = rack.f[i];
         for (c = 0; c < NC; c++)
             base_cut[c] = pt.c[c][CP_CUT];
     }
+}
+static void rack_clear(void) { memset(rack.k, RACK_UNSET & 0xFF, sizeof rack.k), memset(rack.f, RACK_UNSET & 0xFF, sizeof rack.f); }
+static void rack_load(void)
+{
+    if (!(flash_ok && store_on && st_load(RACK_OBJ, &rack, sizeof rack) == (int)sizeof rack && rack.magic == RACK_MAGIC))
+        rack_clear();
+    rack.magic = RACK_MAGIC;
+}
+static void rack_save(void)                        /* (out of a game: a save silences the sound a moment) */
+{
+    if (rack_dirty && flash_ok && store_on)
+        st_save(RACK_OBJ, &rack, sizeof rack);
+    rack_dirty = 0;
 }
 static void say_num(const char *name, int32_t v)   /* "BRILHO 80" in the header */
 {
@@ -223,8 +261,14 @@ static void sctl_set(const sctl_t *c, int32_t v, int rel)   /* rel: v is a chang
     else
         pt.g[c->id] = (int16_t)clamp(rel ? pt.g[c->id] + v : v, GDESC[c->id].min, GDESC[c->id].max);
     sctl_say(c);
-    if (c >= KNOB && c < KNOB + 8)                 /* (a knob: the PATCH screen lights it, draws it anew) */
-        ui.kturn = (uint8_t)(c - KNOB + 1), ui.kturn_t = fm1_ms | 1u, ui.redraw |= D_BODY;
+    if (c >= KNOB && c < KNOB + 8) {               /* (a knob: the PATCH screen lights it, draws it anew) */
+        uint32_t i = (uint32_t)(c - KNOB);
+        int32_t now = c->corner ? (c->id == CP_CUT ? base_cut[0] : pt.c[0][c->id]) : pt.g[c->id];
+        ui.kturn = (uint8_t)(i + 1u), ui.kturn_t = fm1_ms | 1u, ui.redraw |= D_BODY;
+        rack.k[i] = (int8_t)clamp(c->corner ? now - factory.c[0][c->id] : now, -127, 127);
+    } else
+        rack.f[c - FADER] = (int8_t)clamp(pt.g[c->id], 0, 127);
+    rack_dirty = 1;
 }
 
 /* ------------------------------------------------------------- settings, ranking --- */
@@ -569,6 +613,7 @@ static void game_key(uint32_t n)                   /* a key pressed (the keybed,
 }
 static void to_title(void)
 {
+    rack_save();
     tone_stop();
     ui.tone_due = 0;
     ev_push(EV_ALLOFF, 0, 0);
@@ -767,6 +812,13 @@ static void buttons_poll(void)                     /* PLAY: home (the title), th
         case GS_SOUND:
             if (b == B_PATCH || b == B_PLAY)
                 to_title();
+            else if (b == B_GLOBE) {               /* GLOBE there: every sound as it comes */
+                rack_clear();
+                rack_dirty = 1;
+                preset_load(SND[ui.set[SET_SOUND]]);
+                ui_say("DE F\xC1" "BRICA", 0);
+                ui.redraw |= D_BODY;
+            }
             break;
         case GS_NAME:
             if (b == B_OCTUP || b == B_OCTDN)
@@ -950,6 +1002,8 @@ static void ui_init(void)
     set_load();
     lb_load();
     vec_load();
+    rack_load();
+    ui.fad_ready = 0;                              /* (the faders where they are at power-on: the rack's values stay) */
     preset_load(SND[ui.set[SET_SOUND]]);
     enter(GS_TITLE);
 }

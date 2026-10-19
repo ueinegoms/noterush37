@@ -432,7 +432,8 @@ static void card_sound(void)
         num(b, (uint32_t)(v < 0 ? -v : v));
         text_c(cx, 186, &FONT_S, b, lit == k + 1u ? C_YEL : C_WHITE);
     }
-    text_c(120, 212, &FONT_S, "FADERS: VOL REV DLY CHO", C_MUT);
+    text_c(120, 204, &FONT_S, "FADERS: VOL REV DLY CHO", C_MUT);
+    text_c(120, 220, &FONT_S, "GLOBE: TUDO DE F\xC1" "BRICA", C_YEL);
 }
 static void card_setup(void)
 {

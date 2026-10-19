@@ -144,6 +144,30 @@ int main(void)
     btn(B_PATCH);
     CHECK(ui.gs == GS_TITLE, "PATCH again: home");
 
+    /* the rack: what was set goes from sound to sound; what was not, each sound's own */
+    {
+        int16_t drv;
+        btn(B_PATCH);
+        panel_enc(2, 20); panel_ms(40);            /* ATAQUE to a value */
+        panel_enc(0, -10); panel_ms(40);           /* BRILHO 20 darker than the sound's */
+        panel_fader(3, 77); panel_ms(40);          /* CHORUS */
+        btn(B_PLAY);
+        btn(B_GLOBE); btn(B_RIGHT); btn(B_OCTUP); btn(B_GLOBE);   /* SOM: MARIMBA */
+        CHECK(ui.set[SET_SOUND] == 1, "MARIMBA");
+        drv = factory.g[G_DRIVE];
+        CHECK(pt.g[G_AA] == rack.k[2] && rack.k[2] != RACK_UNSET, "ATAQUE went along (%d)", pt.g[G_AA]);
+        CHECK(base_cut[0] == clamp(factory.c[0][CP_CUT] - 20, 0, 127), "BRILHO: 20 darker than MARIMBA's own (%d, %d)",
+              base_cut[0], factory.c[0][CP_CUT]);
+        CHECK(pt.g[G_DRIVE] == drv && pt.g[G_CHMIX] == 77, "DRIVE untouched: MARIMBA's own; CHORUS went along");
+        panel_init();                              /* a power cycle */
+        CHECK(pt.g[G_CHMIX] == 77 && rack.k[2] != RACK_UNSET, "the rack kept over a power cycle");
+        btn(B_PATCH); btn(B_GLOBE);
+        CHECK(pt.g[G_AA] == factory.g[G_AA] && pt.g[G_CHMIX] == factory.g[G_CHMIX], "PATCH, GLOBE: as it comes");
+        btn(B_PLAY);
+        btn(B_GLOBE); btn(B_RIGHT); btn(B_OCTDN); btn(B_GLOBE);   /* back to E.PIANO */
+        CHECK(ui.set[SET_SOUND] == 0 && ui.gs == GS_TITLE, "E.PIANO again");
+    }
+
     /* the settings */
     btn(B_GLOBE);
     CHECK(ui.gs == GS_SETUP, "GLOBE: the settings");

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Wayne (NOTE RUSH 37), on Vector37 by M. Geisler (makkuro) */
+ * Copyright (C) 2026 ueine (NOTE RUSH 37), on Vector37 by M. Geisler (makkuro) */
 /* NOTE RUSH 37: the screen (in Vector37's draw.c's place), in the web version's look: violet ground, the electric
  * blue card, yellow and white, flat. 240 x 240 in five strips (gfx.c's canvas, one DMA transfer each): the header
  * (NOTE RUSH, the combo), the clock, the card (two strips), its foot. Everything is drawn in screen coordinates;

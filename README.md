@@ -1,125 +1,107 @@
+<p align="center"><img src="docs/img/banner.png" width="100%" alt="NOTE RUSH 37 on the SMK-37's screen: the title, a note's name, the staff, a right answer's lightning, the sound, the VETOR"></p>
+
 # NOTE RUSH 37
 
-**NOTE RUSH CYBERFUNK on the M-Vave SMK-37 Elite** (and the Pro / MKE-P37: the same keyboard): the note-reading game
-as firmware, a fork of Vector37 by genkigenki: its board layer, synth engine (the notes sound as E.PIANO) and
-simulator; the game in `firmware/src/game.c` and `gdraw.c` in place of Vector37's `ui.c` and `draw.c`.
+**Try it:** [in your browser](https://ueinegoms.github.io/noterush37/) (the firmware itself, compiled to WebAssembly, on
+a simulated SMK-37; the same page installs it on your keyboard) · **Install:** [below](#install)
 
-In the web version's look (violet, the electric blue card, yellow). FASE 1 MEMORIZE shows each new note; then:
+**A note-reading game for the M-Vave SMK-37** (Elite, Pro, MKE-P37): the firmware version of NOTE RUSH CYBERFUNK, a
+web game. A note is shown (its letter, or on the staff) or played, and you play it on the keys; right answers build a
+combo, with lightning from the screen across the pads; a wrong key or the time out ends the run, and your score goes
+on the keyboard's own top 5. New notes come in as you go: the middle octave first, then the upper, the lower last.
+The keys always sound (nine sounds, all of Vector37's engine), and every knob, fader and wheel plays with the sound.
+The screens are in Brazilian Portuguese.
 
-- **NOME**: the letter alone (C .. B): play it, any octave (+3)
-- **PAUTA**: the staff alone (C3 .. C6): play that very key (+4)
-- **OUVIDO**: the note heard: play it, any octave (+5)
+A fork of [Vector37](https://github.com/genkigenki/Vector37) by genkigenki: its board layer, its update path and its
+synth engine; the game in place of its interface. Unofficial firmware, not affiliated with or endorsed by M-Vave.
+Install at your own risk.
 
-The notes come in by octave: the middle one (C4 .. B4), then the upper (C5 .. C6), the lower (C3 .. B3) last. A right
-answer: lightning in an arc from the bottom left corner to the combo, and across the pads (erratic, as a bolt); ball
-lightning round the combo while it runs. A wrong key or the time out: game over, a name (AAA) for the local top 5.
+## Play
 
-The keys always play; they answer only when asked. SEQ PLAY goes home: from any screen to the title, there it starts
-a game (naming the score: ENVIAR); a pad plays the OUVIDO note again. Title: < > the mode; PATCH: the sound (its eight
-knobs as on the keyboard, each drawn: the filter, the envelope, the drive, the room, the echoes); GLOBE: the settings (TEMPO: SEM LIMITE, 6 s .. 2 s as the
-web; SOM; NOTAS INICIAIS; ACERTOS/FASE). The sound: K1..K8 BRILHO, RESSONÂNCIA, ATAQUE, RELEASE, DRIVE, SALA, ECO
-TEMPO, ECO REPETE; the faders VOLUME, REVERB, DELAY, CHORUS; the pitch wheel a bend; the mod wheel lightning on the
-VETOR's point (thrown about as a bolt). PARA (in, and out again): the VETOR, the same for every sound: a Lissajous
-running free round the four corners, each corner a brightness; where its point is, their brightness blended moves the
-sound's filter, and nothing else. On its screen the knobs are its (K1..K3 the figure, K4..K7 each corner's brightness:
-at 0 it changes nothing, K8 the speed). The
-simulator page installs it on the keyboard (CONECTAR, INSTALAR: Chrome / Edge).
+| | | |
+|---|---|---|
+| ![FASE 2: the letter](docs/img/screen-ask-nome.png) | ![FASE 3: the staff](docs/img/screen-ask-pauta.png) | ![FASE 4: by ear](docs/img/screen-ask-ouvido.png) |
+| **NOME**: the letter alone (C .. B): play it, any octave (+3) | **PAUTA**: the staff alone (C3 .. C6): play that very key (+4) | **OUVIDO**: the note heard: play it, any octave (+5); a pad plays it again |
 
-```
-MODEL=elite sh build.sh            # build/noterush37-elite.fwsc (JieLi toolchain + AC79 SDK V1.2.1, see below)
-python tools/fm1_install.py --yes build/noterush37-elite.fwsc
-sh web/sim/build.sh                # the simulator (Emscripten, or clang + wasm-ld): build/sim
-python3 -m http.server -d build/sim 8737
-mkdir -p build/nrshots && cc -O1 -Ibuild/gen -o build/nr_shot tests/nr_shot.c && build/nr_shot   # rules + screens
-```
+FASE 1 (MEMORIZE) shows each new note, its name and its place on the staff, and plays it. Three right in a row (the
+setting ACERTOS/FASE) move on to the next phase; after OUVIDO a new note comes in. Mode TODAS runs the phases in
+turn; NOME, PAUTA or OUVIDO alone also work (the title's < >). The time: 6 s by default, from SEM LIMITE (none) to
+2 s, as the web version.
 
-Unofficial firmware, untested on a unit yet. Rescue: hold OCT- while switching on. Vector37's own README follows.
+| | | |
+|---|---|---|
+| ![a right answer](docs/img/screen-lightning.png) | ![game over](docs/img/screen-over-pauta.png) | ![the name](docs/img/screen-name.png) |
+| A right answer: lightning from the bottom left corner to the combo, on across the pads (bolts too while a combo runs) | Game over: the right note, the one played | A place in the top 5: three letters, arcade style |
 
----
+## Controls
 
-<p align="center"><img src="docs/img/readme-banner.png" width="100%" alt="Vector37: an orbiting overtone synth for the SMK-37, its orbit screen"></p>
+| | |
+|---|---|
+| Keys | always play; answer when asked |
+| SEQ PLAY | home: from any screen to the title; on the title it starts a game; naming the score it sends |
+| < > | the mode (title), the row (settings), the letter's place (name) |
+| OCT- OCT+ | the value (settings), the letter (name) |
+| Pads | the OUVIDO note again; they light with the lightning |
+| PATCH | the sound: its eight knobs, drawn |
+| GLOBE | the settings: TEMPO, SOM (nine sounds), NOTAS INICIAIS, ACERTOS/FASE |
+| PARA | the VETOR (in, and out again) |
+| K1 .. K8 | BRILHO, RESSONÂNCIA, ATAQUE, RELEASE, DRIVE, SALA, ECO TEMPO, ECO REPETE |
+| Faders | VOLUME, REVERB, DELAY, CHORUS |
+| Pitch wheel | a bend |
+| Mod wheel | lightning on the VETOR's point |
 
-# Vector37
+What you set with the knobs and faders goes along from sound to sound (and is kept); what you never touched stays
+each sound's own. On the PATCH screen GLOBE puts every sound back as it comes. The same key at the same velocity sounds
+the same each time (Vector37's orbit restarts with each note).
 
-**Watch it:** [Vector37 0.3 on YouTube](https://youtu.be/gr2IwKLuwZo) · **Try it:** [in your browser](https://genkigenki.github.io/smk37/vector37-sim/) · **Install:** <https://genkigenki.github.io/smk37/#fw-vector37>
-
-![Vector37 playing](docs/img/orbit.webp)
-
-**An orbiting overtone synth for the M-Vave SMK-37** (and, experimental, the FM-1).
-Four corners, each two overtone generators, a blend and a filter. A sun runs along a path, a moon circles it, and
-where the moon is decides how much of each corner you hear. One screen: the orbit, a small universe with a planet
-in each corner. The pads and the knobs are the planets (four pad groups of 2 x 2; eight knobs for the selected
-planet's sound: the planet draws them, and you hear it alone while you change it), the four faders are the path
-(family, size, speed, morph: they glide to where you move them).
-Thirty-two factory sounds in two banks (FACTORY, and FACTORY 2: the basics, pads, strings, choir, organ, keys,
-basses, sequences, brass, a lead, wind and drums, each a whole scene) and a USER bank of sixteen of yours, one a pad:
-PATCH opens the sound list (a pad: play; held 1 s: SAVE there; < > the sounds of the bank). Wavetables: each generator can read one of eight banks of 32 frames, and the moon moves its
-place as it nears the planet (SCALE: the WAVE knobs). The 3.5 mm MIDI jack sends the keys and wheels as played
-(TRS MIDI OUT; BT, the SETUP set: its channel, the USB MIDI IN channel, the pad light, the sound at power-on). The knob
-sets (CHORD, FX, FADER BANK, ARP, SCALE, BT) open with a
-tap and stay open until tapped again.
-Unofficial firmware, not affiliated with or endorsed by M-Vave. Install at your own risk.
-
-[Control map](docs/CONTROLS.md) · [Design](docs/DESIGN.md) · [On the FM-1](#on-the-fm-1-experimental)
+| | | |
+|---|---|---|
+| ![PATCH: the sound](docs/img/screen-sound.png) | ![PARA: the VETOR](docs/img/screen-vector.png) | ![GLOBE: the settings](docs/img/screen-setup.png) |
+| **PATCH**: K1 .. K8 as they sit on the keyboard, each drawn in 1 px lines: the filter, the envelope, the drive, the room, the echoes | **PARA**: the VETOR, a Lissajous running round the four corners, each a brightness: where its point is, their brightness moves the sound's filter (and nothing else). K1 .. K3 the figure, K4 .. K7 the corners (at 0 it changes nothing), K8 its speed | **GLOBE**: the settings, kept in flash with the ranking |
 
 ## Install
 
-- **Python:** connect the SMK-37 by USB, then
+The SMK-37 Elite takes `noterush37-elite.fwsc`, the SMK-37 Pro `noterush37.fwsc`, the MKE-P37 `noterush37-mke.fwsc`
+(one keyboard under three names; the package is the model's).
 
-  ```
-  python tools/fm1_install.py --yes vector37.fwsc
-  ```
+- **Browser** (Chrome or Edge): connect the keyboard by USB (a data cable), open the
+  [simulator page](https://ueinegoms.github.io/noterush37/), CONECTAR (it shows the model and what it runs), INSTALAR (the
+  package for that model).
+- **Python** (mido, python-rtmidi): `python tools/fm1_install.py --yes noterush37-elite.fwsc`
 
-Installing clears another firmware's stored data on the keyboard (and the other way round).
-To go back to the stock firmware, install it the same way. Rescue: hold OCT - while switching on.
-The SMK-37 Elite and the MKE-P37 take vector37-elite.fwsc / vector37-mke.fwsc.
-
-## On the FM-1 (experimental)
-
-**Untested on a unit.** vector37-fm1.fwsc is the same synth and screen for the M-Vave FM-1 (identity FM-1_700, the
-FM-1's flash layout and update loader). It is built and checked on the host (its panel, its screens, its flash
-guard, the package), but nobody has played it on an FM-1 yet: install it only if you can go back (the stock
-firmware or Felucca installs the same way; rescue: hold OCT- while switching on; OCT- + OCT+ held 5 s: the update
-mode). Reports welcome.
-
-The FM-1 has four knobs, no pads, faders or wheels, so their jobs move:
-
-| SMK-37 | FM-1 |
-|---|---|
-| K1..K8 | KNOB 1..4 on page 1 (K1..K4) and page 2 (K5..K8); SEL: the next page, SELECT turns them, HOME: page 1. The screen tags the four knobs in play with 1..4 and dims the other row |
-| Faders: FAMILY, SIZE, SPEED, MORPH | page 3, the PATH: KNOB 1..4 |
-| Mod wheel: MOON SPEED | the ORBIT set (no planet selected), page 2, KNOB 4 (BPM: the ARP set, or PLAY) |
-| SELECT pads: the planet | ALGORITHM: none, 1, 2, 3, 4 |
-| The 16 pads (SELECT, MODE, FILTER, MUTE) | EDIT held: the lowest 16 keys, four groups of four, the same order; their LEDs show the pads' state |
-| < > | PRESETS |
-| CHORD, FX, FADER BANK, ARP: the knob sets (a tap opens one, again closes) | ENV, FX, LFO, ARP, the same (SEL still turns the page) |
-| SEQ, REC, PLAY, GLOBE, PARA | SEQ, REC, PLAY, GLO, SAVE (the same jobs) |
-| REPEAT (RESTART), PATCH twice (all notes off) | EDIT + PLAY, EDIT + SEQ |
-| 37 keys with velocity | 27 keys (F3..G5), velocity 100; their LEDs light the notes held |
-| Volume | MASTER (the pot) |
-| TRS MIDI OUT, KNOB BANK (the guide), SAVE and the SETUP set | none (the FM-1's jack is MIDI IN; no store of its own, below) |
-
-Vector37 keeps no data of its own on the FM-1 and writes only its update staging: another firmware's store
-(Felucca's projects and settings) stays as it was. The full map: [docs/CONTROLS.md](docs/CONTROLS.md#on-the-fm-1-experimental).
-
-![FM-1: a planet's knobs, page 1](docs/img/screen-fm1-planet.png)
+Installing clears another firmware's stored data on the keyboard (and the other way round). To go back to the stock
+firmware, or to another one, install it the same way (the keyboard's USB port is "NoteRush SMK37": the installers find
+it, [genkigenki's](https://genkigenki.github.io/smk37/) too). Rescue: hold OCT- while switching on.
 
 ## Build
 
 ```
-sh build.sh                        # Linux / WSL: JieLi toolchain (tools/get_toolchain.sh)
-MODEL=elite sh build.sh            # (or mke) the same for the SMK-37 Elite / the MKE-P37
-BOARD=fm1 sh build.sh              # the FM-1 (experimental): build/vector37-fm1.fwsc
-sh tests/run_tests.sh OUTDIR       # engine renders, every control on the screen, board layer tests
-sh web/sim/build.sh                # the simulator (Emscripten), then serve build/sim
-sh tools/docs_img.sh               # the screenshots and the animation in docs/img
+sh tools/get_toolchain.sh          # the JieLi toolchain (Linux x86-64) into ~/.jieli
+                                   # and JieLi's AC79 SDK V1.2.1 (its tools) in ~/fw-AC79_AIoT_SDK:
+                                   # gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK, tag AC79NN_SDK_V1.2.1_2023-12-13
+MODEL=elite sh build.sh            # build/noterush37-elite.fwsc (pro: the default; mke)
+sh tests/run_tests.sh              # the game played on the host, the engine, the board layer, the installer
+sh web/sim/build.sh                # the simulator (Emscripten, or clang + wasm-ld alone): build/sim
+sh tools/site.sh                   # the site in docs/ (GitHub Pages): the simulator, the packages, the screenshots
 ```
+
+The game is `firmware/src/game.c` (the rules, the controls, the LEDs) and `firmware/src/gdraw.c` (the screen); the
+installer for the browser is `web/sim/install.js` (a port of `tools/fm1_install.py`).
 
 ## Credits
 
-Inspired by the Beetlecrab Vector and its Orbiter.
-Board layer from SLOOP by isod89, based on Felucca by Leo Kuroshita. Master stage after Melodee by Kerem Kilic
-(GPL-3.0). Plate after J. Dattorro, "Effect Design 1" (1997). Terminus font (SIL OFL 1.1).
-ref/ holds the Vector manual for reference only (CC BY-SA 4.0, Beetlecrab s.r.o.); it is not part of the firmware.
+NOTE RUSH 37 and NOTE RUSH CYBERFUNK by ueine.
+Built on [Vector37](https://github.com/genkigenki/Vector37) by genkigenki (M. Geisler): the synth engine (inspired by the
+Beetlecrab Vector), the simulator, the SMK-37's board layer and installer. Board layer from SLOOP by isod89, based on
+Felucca by Leo Kuroshita. Master stage after Melodee by Kerem Kilic. Plate after J. Dattorro, "Effect Design 1" (1997).
+Terminus font (SIL OFL 1.1).
 
-By genkigenki. Licence: GPL-3.0 (see [LICENSE](LICENSE)).
+Licence: GPL-3.0 (see [LICENSE](LICENSE)).
+
+---
+
+**Em português:** um jogo de leitura de notas pro M-Vave SMK-37 (Elite, Pro, MKE-P37), a versão em firmware do NOTE
+RUSH CYBERFUNK. Leia a letra, leia a pauta ou ouça a nota e toque no teclado; acerto faz combo (com raio da tela pros
+pads), erro ou tempo esgotado encerra, e o seu placar vai pro top 5 do próprio teclado. Teste no
+[navegador](https://ueinegoms.github.io/noterush37/) e instale pela mesma página (Chrome ou Edge: CONECTAR, INSTALAR).
+Firmware não oficial, por sua conta e risco; resgate: segure OCT- ao ligar.

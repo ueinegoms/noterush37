@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Wayne (NOTE RUSH 37), on Vector37 by M. Geisler (makkuro) */
+ * Copyright (C) 2026 ueine (NOTE RUSH 37), on Vector37 by M. Geisler (makkuro) */
 /* NOTE RUSH 37: the game (in Vector37's ui.c's place; the board layer and the synth engine are Vector37's).
  * As the web version (NOTE RUSH CYBERFUNK):
  *   FASE 1 MEMORIZE  the new notes shown (name and staff) and heard

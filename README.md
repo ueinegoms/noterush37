@@ -2,7 +2,7 @@
 
 # NOTE RUSH 37
 
-**Try it:** [in your browser](https://ueinegoms.github.io/noterush37/) (the firmware itself, compiled to WebAssembly, on
+**Watch it:** [on YouTube](https://youtube.com/shorts/pjCsZ0zWJfI) (in Portuguese) · **Try it:** [in your browser](https://ueinegoms.github.io/noterush37/) (the firmware itself, compiled to WebAssembly, on
 a simulated SMK-37; the same page installs it on your keyboard) · **Install:** [below](#install)
 
 **A note-reading game for the M-Vave SMK-37** (Elite, Pro, MKE-P37): the firmware version of NOTE RUSH CYBERFUNK, a
@@ -102,6 +102,7 @@ Licence: GPL-3.0 (see [LICENSE](LICENSE)).
 
 **Em português:** um jogo de leitura de notas pro M-Vave SMK-37 (Elite, Pro, MKE-P37), a versão em firmware do NOTE
 RUSH CYBERFUNK. Leia a letra, leia a pauta ou ouça a nota e toque no teclado; acerto faz combo (com raio da tela pros
-pads), erro ou tempo esgotado encerra, e o seu placar vai pro top 5 do próprio teclado. Teste no
+pads), erro ou tempo esgotado encerra, e o seu placar vai pro top 5 do próprio teclado. Veja o
+[vídeo](https://youtube.com/shorts/pjCsZ0zWJfI), teste no
 [navegador](https://ueinegoms.github.io/noterush37/) e instale pela mesma página (Chrome ou Edge: CONECTAR, INSTALAR).
 Firmware não oficial, por sua conta e risco; resgate: segure OCT- ao ligar.

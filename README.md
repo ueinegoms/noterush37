@@ -90,7 +90,7 @@ installer for the browser is `web/sim/install.js` (a port of `tools/fm1_install.
 
 ## Credits
 
-NOTE RUSH 37 and NOTE RUSH CYBERFUNK by ueine.
+NOTE RUSH 37 by ueine, inspired by and based on [NOTE RUSH CYBERFUNK](https://ueinegoms.github.io/note-rush-cyberfunk/), ueine's web game.
 Built on [Vector37](https://github.com/genkigenki/Vector37) by genkigenki (M. Geisler): the synth engine (inspired by the
 Beetlecrab Vector), the simulator, the SMK-37's board layer and installer. Board layer from SLOOP by isod89, based on
 Felucca by Leo Kuroshita. Master stage after Melodee by Kerem Kilic. Plate after J. Dattorro, "Effect Design 1" (1997).

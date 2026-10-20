@@ -5,8 +5,8 @@
 **Watch it:** [on YouTube](https://youtube.com/shorts/pjCsZ0zWJfI) (in Portuguese) · **Try it:** [in your browser](https://ueinegoms.github.io/noterush37/) (the firmware itself, compiled to WebAssembly, on
 a simulated SMK-37; the same page installs it on your keyboard) · **Install:** [below](#install)
 
-**A note-reading game for the M-Vave SMK-37** (Elite, Pro, MKE-P37): the firmware version of NOTE RUSH CYBERFUNK, a
-web game. A note is shown (its letter, or on the staff) or played, and you play it on the keys; right answers build a
+**A note-reading game for the M-Vave SMK-37** (Elite, Pro, MKE-P37): the firmware version of
+[NOTE RUSH CYBERFUNK](https://ueinegoms.github.io/note-rush-cyberfunk/), a web game (play it there too). A note is shown (its letter, or on the staff) or played, and you play it on the keys; right answers build a
 combo, with lightning from the screen across the pads; a wrong key or the time out ends the run, and your score goes
 on the keyboard's own top 5. New notes come in as you go: the middle octave first, then the upper, the lower last.
 The keys always sound (nine sounds, all of Vector37's engine), and every knob, fader and wheel plays with the sound.
@@ -100,8 +100,8 @@ Licence: GPL-3.0 (see [LICENSE](LICENSE)).
 
 ---
 
-**Em português:** um jogo de leitura de notas pro M-Vave SMK-37 (Elite, Pro, MKE-P37), a versão em firmware do NOTE
-RUSH CYBERFUNK. Leia a letra, leia a pauta ou ouça a nota e toque no teclado; acerto faz combo (com raio da tela pros
+**Em português:** um jogo de leitura de notas pro M-Vave SMK-37 (Elite, Pro, MKE-P37), a versão em firmware do
+[NOTE RUSH CYBERFUNK](https://ueinegoms.github.io/note-rush-cyberfunk/). Leia a letra, leia a pauta ou ouça a nota e toque no teclado; acerto faz combo (com raio da tela pros
 pads), erro ou tempo esgotado encerra, e o seu placar vai pro top 5 do próprio teclado. Veja o
 [vídeo](https://youtube.com/shorts/pjCsZ0zWJfI), teste no
 [navegador](https://ueinegoms.github.io/noterush37/) e instale pela mesma página (Chrome ou Edge: CONECTAR, INSTALAR).
